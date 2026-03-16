@@ -74,7 +74,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         </p>
       </motion.div>
 
-      <div className="flex gap-4 w-full max-w-xs">
+      <div className="flex gap-4 w-full max-w-xs mb-12">
         <button 
           onClick={onFinish}
           className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors"
@@ -82,6 +82,89 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
           ابدأ الآن
         </button>
       </div>
+
+      {/* Team Section */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        className="w-full max-w-md md:max-w-2xl overflow-y-auto max-h-[45vh] px-4 custom-scrollbar"
+      >
+        <h3 className="text-xl font-bold text-slate-800 mb-6 border-r-4 border-emerald-500 pr-3 text-right">فريق العمل</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
+          {/* Toufik */}
+          <motion.div 
+            whileHover={{ scale: 1.02, x: -4 }}
+            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
+          >
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
+              <img 
+                src="https://images.unsplash.com/photo-1566492031773-4f4e44671857?fit=crop&w=200&h=200" 
+                alt="توفيق" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="text-right flex-1">
+              <h4 className="font-bold text-slate-900">توفيق</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">مختص في المعلوماتية و الرياضيات</p>
+            </div>
+          </motion.div>
+
+          {/* Abdelwahab */}
+          <motion.div 
+            whileHover={{ scale: 1.02, x: -4 }}
+            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
+          >
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
+              <img 
+                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?fit=crop&w=200&h=200" 
+                alt="عبدالوهاب" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="text-right flex-1">
+              <h4 className="font-bold text-slate-900">عبدالوهاب</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">مختص بالبرمجة و صناعة المواقع و التطبيقات</p>
+            </div>
+          </motion.div>
+
+          {/* Fictional 1: Sarah */}
+          <motion.div 
+            whileHover={{ scale: 1.02, x: -4 }}
+            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
+          >
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
+              <img 
+                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" 
+                alt="سارة" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="text-right flex-1">
+              <h4 className="font-bold text-slate-900">سارة</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">مختصة في التصميم الجرافيكي وواجهة المستخدم (UI/UX)</p>
+            </div>
+          </motion.div>
+
+          {/* Fictional 2: Omar */}
+          <motion.div 
+            whileHover={{ scale: 1.02, x: -4 }}
+            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
+          >
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
+              <img 
+                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Omar" 
+                alt="عمر" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="text-right flex-1">
+              <h4 className="font-bold text-slate-900">عمر</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">مختص في العلوم الطبيعية والفيزياء</p>
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
     </motion.div>
   );
 };
