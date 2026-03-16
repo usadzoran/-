@@ -38,8 +38,8 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         className="mb-8"
       >
         <img 
-          src="https://picsum.photos/seed/education/800/600" 
-          alt="Education Illustration" 
+          src="https://picsum.photos/seed/teacher-whiteboard-online/800/600" 
+          alt="Teacher with whiteboard and students online" 
           className="w-full max-w-md rounded-2xl shadow-2xl"
           referrerPolicy="no-referrer"
         />
@@ -58,10 +58,21 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.6 }}
-        className="text-xl text-slate-600 mb-12 max-w-sm"
+        className="text-xl text-slate-600 mb-6 max-w-sm"
       >
         تعلم مع أفضل الأساتذة مباشرة و بسهولة
       </motion.p>
+
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.7 }}
+        className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 mb-10 max-w-md"
+      >
+        <p className="text-slate-700 leading-relaxed text-sm md:text-base">
+          منصة "علّمني" هي بوابتك المتكاملة للتعليم عن بعد، حيث نجمع بين نخبة من الأساتذة المتميزين والطلاب في بيئة تفاعلية متطورة. نوفر لك دروساً مباشرة، ملفات تعليمية، وفيديوهات توضيحية لتسهيل مسيرتك الدراسية وضمان تفوقك من أي مكان وفي أي وقت.
+        </p>
+      </motion.div>
 
       <div className="flex gap-4 w-full max-w-xs">
         <button 
