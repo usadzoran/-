@@ -17,6 +17,8 @@ export interface UserProfile {
 export interface Post {
   id: string;
   author_id: string;
+  author_name?: string;
+  author_image?: string;
   content: string;
   image_url?: string;
   video_url?: string;
@@ -31,6 +33,8 @@ export interface PostComment {
   id: string;
   post_id: string;
   author_id: string;
+  author_name?: string;
+  author_image?: string;
   content: string;
   created_at: string;
   author?: UserProfile;
@@ -53,6 +57,8 @@ export interface LiveClass {
 export interface Message {
   id: string;
   sender_id: string;
+  sender_name?: string;
+  sender_image?: string;
   receiver_id: string;
   content: string;
   is_read: boolean;

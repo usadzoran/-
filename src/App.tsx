@@ -450,6 +450,12 @@ export default function App() {
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
   const [selectedLive, setSelectedLive] = useState<LiveClass | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploadType, setUploadType] = useState<'file' | 'video'>('file');
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadSubject, setUploadSubject] = useState('الرياضيات');
+  const [uploadUrl, setUploadUrl] = useState('');
+  const [uploadThumbnail, setUploadThumbnail] = useState('');
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [selectedUserForChat, setSelectedUserForChat] = useState<UserProfile | null>(null);
@@ -618,6 +624,8 @@ export default function App() {
     try {
       await addDoc(collection(db, 'posts'), {
         author_id: profile.auth_id,
+        author_name: `${profile.first_name} ${profile.last_name}`,
+        author_image: profile.profile_image || null,
         content: newPostContent,
         image_url: newPostImage || null,
         likes_count: 0,
@@ -658,6 +666,8 @@ export default function App() {
       await addDoc(collection(db, `posts/${selectedPostForComment.id}/comments`), {
         post_id: selectedPostForComment.id,
         author_id: profile.auth_id,
+        author_name: `${profile.first_name} ${profile.last_name}`,
+        author_image: profile.profile_image || null,
         content: newComment,
         created_at: new Date().toISOString()
       });
@@ -710,6 +720,8 @@ export default function App() {
     try {
       await addDoc(collection(db, 'messages'), {
         sender_id: profile.auth_id,
+        sender_name: `${profile.first_name} ${profile.last_name}`,
+        sender_image: profile.profile_image || null,
         receiver_id: selectedUserForChat.auth_id,
         content: newMessage,
         is_read: false,
@@ -751,6 +763,42 @@ export default function App() {
     setSelectedLive(null);
     setIsHandRaised(false);
     setIsMicOn(false);
+  };
+
+  const handleUploadContent = async () => {
+    if (!profile || !uploadTitle.trim() || !uploadUrl.trim()) return;
+
+    try {
+      if (uploadType === 'file') {
+        await addDoc(collection(db, 'lesson_files'), {
+          teacher_id: profile.auth_id,
+          title: uploadTitle,
+          subject: uploadSubject,
+          file_url: uploadUrl,
+          file_type: 'pdf',
+          created_at: new Date().toISOString()
+        });
+        await logActivity('قام برفع ملف جديد', uploadTitle);
+      } else {
+        await addDoc(collection(db, 'explain_videos'), {
+          teacher_id: profile.auth_id,
+          title: uploadTitle,
+          subject: uploadSubject,
+          video_url: uploadUrl,
+          thumbnail_url: uploadThumbnail || null,
+          created_at: new Date().toISOString()
+        });
+        await logActivity('قام برفع فيديو جديد', uploadTitle);
+      }
+
+      setUploadTitle('');
+      setUploadUrl('');
+      setUploadThumbnail('');
+      setIsUploadModalOpen(false);
+      fetchFilesAndVideos(profile);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, uploadType === 'file' ? 'lesson_files' : 'explain_videos');
+    }
   };
 
   if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
@@ -831,20 +879,20 @@ export default function App() {
               {/* Feed */}
               {posts.map((post) => (
                 <div key={post.id} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <img 
-                        src={post.author?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author_id}`} 
-                        className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
-                      />
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-lg">{post.author?.first_name} {post.author?.last_name}</h4>
-                        <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(post.created_at).toLocaleDateString('ar-EG')}
-                        </p>
+                    <div className="p-6 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src={post.author_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author_id}`} 
+                          className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
+                        />
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-lg">{post.author_name}</h4>
+                          <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(post.created_at).toLocaleDateString('ar-EG')}
+                          </p>
+                        </div>
                       </div>
-                    </div>
                     <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl">
                       <MoreVertical className="w-5 h-5" />
                     </button>
@@ -949,24 +997,34 @@ export default function App() {
               
               <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-50">
                 {messages.length > 0 ? messages.map((msg) => {
-                  const otherUser = msg.sender_id === profile?.id ? null : msg.sender;
-                  if (!otherUser) return null;
+                  const isMe = msg.sender_id === profile?.auth_id;
+                  const otherUserName = isMe ? 'أنت' : msg.sender_name;
+                  const otherUserImage = isMe ? profile?.profile_image : msg.sender_image;
+                  
                   return (
                     <button 
                       key={msg.id} 
-                      onClick={() => handleOpenChat(otherUser)}
+                      onClick={() => {
+                        // In a real app, we'd find the other user object
+                        // For now, we'll just open the chat with what we have
+                        if (!isMe) {
+                          setSelectedUserForChat({ auth_id: msg.sender_id, first_name: msg.sender_name?.split(' ')[0] || '', last_name: msg.sender_name?.split(' ')[1] || '', profile_image: msg.sender_image } as UserProfile);
+                          setIsChatModalOpen(true);
+                          fetchChatMessages(msg.sender_id);
+                        }
+                      }}
                       className="w-full p-6 flex items-center gap-5 hover:bg-slate-50 transition-all text-right group"
                     >
                       <div className="relative">
                         <img 
-                          src={otherUser.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.id}`} 
+                          src={otherUserImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_id}`} 
                           className="w-16 h-16 rounded-[1.5rem] border-2 border-emerald-50 shadow-sm"
                         />
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-center mb-1.5">
-                          <h4 className="font-black text-slate-900 text-lg">{otherUser.first_name} {otherUser.last_name}</h4>
+                          <h4 className="font-black text-slate-900 text-lg">{otherUserName}</h4>
                           <span className="text-xs text-slate-400 font-bold">{new Date(msg.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <p className="text-slate-500 truncate font-medium">{msg.content}</p>
@@ -993,9 +1051,20 @@ export default function App() {
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">المكتبة التعليمية</h2>
-                <button className="p-3 bg-white shadow-sm border border-slate-100 text-emerald-600 rounded-2xl hover:scale-110 transition-transform">
-                  <Search className="w-6 h-6" />
-                </button>
+                <div className="flex gap-2">
+                  {profile?.role === 'teacher' && (
+                    <button 
+                      onClick={() => setIsUploadModalOpen(true)}
+                      className="p-3 bg-emerald-600 text-white shadow-lg shadow-emerald-100 rounded-2xl hover:bg-emerald-700 transition-all flex items-center gap-2"
+                    >
+                      <Plus className="w-6 h-6" />
+                      <span className="text-sm font-bold">رفع محتوى</span>
+                    </button>
+                  )}
+                  <button className="p-3 bg-white shadow-sm border border-slate-100 text-emerald-600 rounded-2xl hover:scale-110 transition-transform">
+                    <Search className="w-6 h-6" />
+                  </button>
+                </div>
               </div>
 
               {/* Subjects Grid */}
@@ -1020,14 +1089,14 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {explainVideos.map(video => (
                     <div key={video.id} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group">
-                      <div className="relative h-48 bg-slate-900">
+                      <a href={video.video_url} target="_blank" rel="noopener noreferrer" className="relative h-48 bg-slate-900 block">
                         <img src={video.thumbnail_url || `https://picsum.photos/seed/${video.id}/400/300`} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-125 transition-transform duration-500">
                             <PlayCircle className="text-white w-10 h-10" />
                           </div>
                         </div>
-                      </div>
+                      </a>
                       <div className="p-5">
                         <h4 className="font-bold text-slate-900 mb-1">{video.title}</h4>
                         <p className="text-xs text-slate-500 font-medium">{video.subject}</p>
@@ -1053,9 +1122,14 @@ export default function App() {
                         <h4 className="font-bold text-slate-900 mb-1">{file.title}</h4>
                         <p className="text-xs text-slate-400 font-bold">{file.subject} • 2.4 MB</p>
                       </div>
-                      <button className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all">
+                      <a 
+                        href={file.file_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all"
+                      >
                         <Download className="w-6 h-6" />
-                      </button>
+                      </a>
                     </div>
                   ))}
                 </div>
@@ -1395,6 +1469,105 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Upload Modal */}
+      <AnimatePresence>
+        {isUploadModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-2xl font-black text-slate-900">رفع محتوى جديد</h3>
+                <button onClick={() => setIsUploadModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl">
+                  <button 
+                    onClick={() => setUploadType('file')}
+                    className={`flex-1 py-3 rounded-xl font-bold transition-all ${uploadType === 'file' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}
+                  >
+                    ملف (PDF)
+                  </button>
+                  <button 
+                    onClick={() => setUploadType('video')}
+                    className={`flex-1 py-3 rounded-xl font-bold transition-all ${uploadType === 'video' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}
+                  >
+                    فيديو توضيحي
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">العنوان</label>
+                    <input 
+                      type="text"
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      placeholder="مثال: ملخص الفصل الأول"
+                      className="w-full bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">المادة</label>
+                    <select 
+                      value={uploadSubject}
+                      onChange={(e) => setUploadSubject(e.target.value)}
+                      className="w-full bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none appearance-none"
+                    >
+                      {['الرياضيات', 'الفيزياء', 'العلوم', 'الأدب', 'اللغات'].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">رابط {uploadType === 'file' ? 'الملف' : 'الفيديو'}</label>
+                    <input 
+                      type="text"
+                      value={uploadUrl}
+                      onChange={(e) => setUploadUrl(e.target.value)}
+                      placeholder="https://example.com/resource"
+                      className="w-full bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  {uploadType === 'video' && (
+                    <div>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">رابط الصورة المصغرة (اختياري)</label>
+                      <input 
+                        type="text"
+                        value={uploadThumbnail}
+                        onChange={(e) => setUploadThumbnail(e.target.value)}
+                        placeholder="https://example.com/thumb.jpg"
+                        className="w-full bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  onClick={handleUploadContent}
+                  className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                >
+                  تأكيد الرفع
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Create Post Modal */}
       <AnimatePresence>
         {isPostModalOpen && (
@@ -1471,12 +1644,12 @@ export default function App() {
                 {postComments.length > 0 ? postComments.map((comment) => (
                   <div key={comment.id} className="flex gap-4">
                     <img 
-                      src={comment.author?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} 
+                      src={comment.author_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_id}`} 
                       className="w-10 h-10 rounded-xl border border-slate-100"
                     />
                     <div className="flex-1 bg-slate-50 rounded-2xl p-4">
                       <div className="flex justify-between items-center mb-1">
-                        <h5 className="font-bold text-slate-900 text-sm">{comment.author?.first_name} {comment.author?.last_name}</h5>
+                        <h5 className="font-bold text-slate-900 text-sm">{comment.author_name}</h5>
                         <span className="text-[10px] text-slate-400 font-bold">{new Date(comment.created_at).toLocaleDateString('ar-EG')}</span>
                       </div>
                       <p className="text-slate-600 text-sm leading-relaxed">{comment.content}</p>
