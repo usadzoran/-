@@ -185,6 +185,15 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
     try {
       if (isLogin) {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        
+        // Special case for admin: if login fails but it's the admin email, try to sign up
+        if (error && email === 'wahablila31000@gmail.com') {
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+          if (signUpError) throw signUpError;
+          onAuthSuccess(signUpData.user);
+          return;
+        }
+        
         if (error) throw error;
         onAuthSuccess(data.user);
       } else {
@@ -193,14 +202,15 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
         
         // Create user profile
         if (data.user) {
+          const isMainAdmin = email === 'wahablila31000@gmail.com';
           const { error: profileError } = await supabase
             .from('users')
             .insert({
               auth_id: data.user.id,
-              first_name: firstName,
-              last_name: lastName,
-              role: role,
-              account_status: role === 'teacher' ? 'pending' : 'active'
+              first_name: isMainAdmin ? 'المدير' : firstName,
+              last_name: isMainAdmin ? 'العام' : lastName,
+              role: isMainAdmin ? 'admin' : role,
+              account_status: isMainAdmin ? 'active' : (role === 'teacher' ? 'pending' : 'active')
             });
           if (profileError) throw profileError;
         }
@@ -393,14 +403,42 @@ export default function App() {
     if (liveData) setLiveClasses(liveData);
   };
 
-  const fetchProfile = async (authId: string) => {
+  const fetchProfile = async (authId: string, userEmail?: string) => {
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('auth_id', authId)
       .single();
     
-    if (data) setProfile(data);
+    if (data) {
+      // Force admin role for the specific email
+      if (userEmail === 'wahablila31000@gmail.com' && data.role !== 'admin') {
+        const { data: updatedData } = await supabase
+          .from('users')
+          .update({ role: 'admin' })
+          .eq('auth_id', authId)
+          .select()
+          .single();
+        if (updatedData) setProfile(updatedData);
+        else setProfile(data);
+      } else {
+        setProfile(data);
+      }
+    } else if (userEmail === 'wahablila31000@gmail.com') {
+      // If profile doesn't exist for admin, create it
+      const { data: newData } = await supabase
+        .from('users')
+        .insert({
+          auth_id: authId,
+          first_name: 'المدير',
+          last_name: 'العام',
+          role: 'admin',
+          account_status: 'active'
+        })
+        .select()
+        .single();
+      if (newData) setProfile(newData);
+    }
     setLoading(false);
   };
 
@@ -411,7 +449,7 @@ export default function App() {
   if (!user) {
     return <AuthScreen onAuthSuccess={(u) => {
       setUser(u);
-      fetchProfile(u.id);
+      fetchProfile(u.id, u.email);
     }} />;
   }
 
