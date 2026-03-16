@@ -27,7 +27,7 @@ export interface Post {
   is_liked?: boolean;
 }
 
-export interface Comment {
+export interface PostComment {
   id: string;
   post_id: string;
   author_id: string;

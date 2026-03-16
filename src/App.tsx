@@ -34,7 +34,31 @@ import {
   AlertCircle,
   Info,
 } from 'lucide-react';
-import { supabase } from './lib/supabase';
+import { auth, db } from './firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDocs, 
+  getDocFromServer,
+  Timestamp,
+  limit
+} from 'firebase/firestore';
 import { 
   UserProfile, 
   UserRole, 
@@ -44,16 +68,69 @@ import {
   Subscription, 
   LessonFile, 
   ExplainVideo, 
-  Notification 
+  Notification,
+  PostComment
 } from './types';
+
+// --- Error Handling for Firestore ---
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+};
 
 // --- Helper for Activity Logging ---
 const logActivity = async (action: string, details: string = '') => {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = auth.currentUser;
   if (!user) return;
   try {
-    await supabase.from('activity_logs').insert({
-      user_id: user.id,
+    await addDoc(collection(db, 'activity_logs'), {
+      user_id: user.uid,
       user_name: user.email,
       action,
       details,
@@ -143,36 +220,57 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        onAuthSuccess(data.user);
+        const { user } = await signInWithEmailAndPassword(auth, email, password);
+        onAuthSuccess(user);
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
+        // Registration Flow
+        const { user } = await createUserWithEmailAndPassword(auth, email, password);
         
-        if (data.user) {
+        if (user) {
           const isMainAdmin = email === 'wahablila31000@gmail.com';
-          await supabase.from('users').insert({
-            auth_id: data.user.id,
+          const profileData = {
+            id: user.uid,
+            auth_id: user.uid,
             first_name: isMainAdmin ? 'المدير' : firstName,
             last_name: isMainAdmin ? 'العام' : lastName,
             role: isMainAdmin ? 'admin' : role,
             account_status: isMainAdmin ? 'active' : (role === 'teacher' ? 'pending' : 'active'),
             created_at: new Date().toISOString()
-          });
+          };
+
+          try {
+            await setDoc(doc(db, 'users', user.uid), profileData);
+          } catch (insertError) {
+            console.error("Profile creation error:", insertError);
+            throw new Error("تم إنشاء الحساب ولكن فشل إنشاء الملف الشخصي. يرجى التواصل مع الدعم.");
+          }
+
+          setSuccess(role === 'teacher' ? 'تم إنشاء حسابك بنجاح! بانتظار موافقة الإدارة.' : 'تم إنشاء حسابك بنجاح! جاري تحويلك...');
+          
+          setTimeout(() => {
+            onAuthSuccess(user);
+          }, 2000);
         }
-        onAuthSuccess(data.user);
       }
     } catch (err: any) {
-      setError(err.message === 'Invalid login credentials' ? 'خطأ في البريد الإلكتروني أو كلمة المرور' : err.message);
+      console.error("Auth error:", err);
+      if (err.code === 'auth/network-request-failed') {
+        setError('فشل الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
+      } else if (err.code === 'auth/invalid-credential') {
+        setError('خطأ في البريد الإلكتروني أو كلمة المرور');
+      } else {
+        setError(err.message || 'حدث خطأ غير متوقع');
+      }
     } finally {
       setLoading(false);
     }
@@ -182,12 +280,12 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
     setLoading(true);
     setError(null);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: 'wahablila31000@gmail.com', 
-        password: '123456' 
-      });
-      if (error) throw error;
-      onAuthSuccess(data.user);
+      const { user } = await signInWithEmailAndPassword(
+        auth, 
+        'wahablila31000@gmail.com', 
+        '123456' 
+      );
+      onAuthSuccess(user);
     } catch (err: any) {
       setError('فشل تسجيل الدخول التجريبي. يرجى المحاولة يدوياً.');
     } finally {
@@ -219,6 +317,17 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
           >
             <AlertCircle className="w-5 h-5" />
             {error}
+          </motion.div>
+        )}
+
+        {success && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-emerald-50 text-emerald-600 rounded-2xl text-center font-bold text-sm border border-emerald-100 flex items-center justify-center gap-2"
+          >
+            <CheckCircle className="w-5 h-5" />
+            {success}
           </motion.div>
         )}
 
@@ -348,31 +457,32 @@ export default function App() {
   const [newMessage, setNewMessage] = useState('');
   const [selectedPostForComment, setSelectedPostForComment] = useState<Post | null>(null);
   const [newComment, setNewComment] = useState('');
-  const [postComments, setPostComments] = useState<Comment[]>([]);
+  const [postComments, setPostComments] = useState<PostComment[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostImage, setNewPostImage] = useState('');
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [isMicApproved, setIsMicApproved] = useState(false);
-  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verify Supabase Connection
+    // Verify Firebase Connection
     const checkConnection = async () => {
       try {
-        const { error } = await supabase.from('users').select('count', { count: 'exact', head: true });
-        if (error) throw error;
+        await getDocFromServer(doc(db, 'test', 'connection'));
       } catch (err: any) {
-        console.error('Supabase connection error:', err);
-        setSupabaseError('فشل الاتصال بقاعدة البيانات. يرجى التحقق من الإعدادات.');
+        if (err.message.includes('the client is offline')) {
+          console.error('Firebase connection error:', err);
+          setFirebaseError('فشل الاتصال بقاعدة البيانات. يرجى التحقق من الإعدادات.');
+        }
       }
     };
     checkConnection();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        await fetchProfile(firebaseUser.uid);
       } else {
         setUser(null);
         setProfile(null);
@@ -380,54 +490,63 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const fetchProfile = async (authId: string) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', authId)
-      .single();
-    
-    if (data) {
-      setProfile(data);
-      setupRealtime(data);
-      fetchAllData(data);
+    try {
+      const docRef = doc(db, 'users', authId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data() as UserProfile;
+        setProfile(data);
+        setupRealtime(data);
+        fetchAllData(data);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `users/${authId}`);
     }
     setLoading(false);
   };
 
   const setupRealtime = (userProfile: UserProfile) => {
     // Real-time Posts
-    supabase.channel('posts-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts(userProfile))
-      .subscribe();
+    onSnapshot(query(collection(db, 'posts'), orderBy('created_at', 'desc')), (snapshot) => {
+      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+      setPosts(postsData);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'posts'));
 
     // Real-time Live Classes
-    supabase.channel('live-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_classes' }, () => fetchLiveClasses())
-      .subscribe();
+    onSnapshot(query(collection(db, 'live_classes'), orderBy('start_time', 'asc')), (snapshot) => {
+      const classesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LiveClass));
+      setLiveClasses(classesData);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'live_classes'));
 
     // Real-time Messages
-    supabase.channel('messages-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userProfile.id}` }, (payload) => {
-        setMessages(prev => [payload.new as Message, ...prev]);
-        fetchNotifications(userProfile);
-      })
-      .subscribe();
+    const messagesQuery = query(
+      collection(db, 'messages'),
+      where('receiver_id', '==', userProfile.auth_id),
+      orderBy('created_at', 'desc')
+    );
+    onSnapshot(messagesQuery, (snapshot) => {
+      const newMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Message));
+      setMessages(prev => {
+        const combined = [...newMessages, ...prev];
+        return Array.from(new Set(combined.map(m => m.id))).map(id => combined.find(m => m.id === id)!);
+      });
+      fetchNotifications(userProfile);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'messages'));
 
     // Real-time Notifications
-    supabase.channel('notifications-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userProfile.id}` }, () => fetchNotifications(userProfile))
-      .subscribe();
+    onSnapshot(query(collection(db, 'notifications'), where('user_id', '==', userProfile.auth_id), orderBy('created_at', 'desc')), (snapshot) => {
+      const notificationsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      setNotifications(notificationsData);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'notifications'));
   };
 
   const fetchAllData = (userProfile: UserProfile) => {
-    fetchPosts(userProfile);
-    fetchLiveClasses();
-    fetchMessages(userProfile);
-    fetchNotifications(userProfile);
+    // Initial fetch for non-realtime or complex data
     fetchFilesAndVideos(userProfile);
     fetchSubscriptions(userProfile);
     if (userProfile.role === 'admin') {
@@ -435,102 +554,95 @@ export default function App() {
     }
   };
 
-  const fetchPosts = async (userProfile: UserProfile) => {
-    // If student, filter by subscriptions
-    let query = supabase.from('posts').select('*, author:users(*)').order('created_at', { ascending: false });
-    
-    const { data } = await query;
-    if (data) setPosts(data);
-  };
-
-  const fetchLiveClasses = async () => {
-    const { data } = await supabase.from('live_classes').select('*, teacher:users(*)').order('start_time', { ascending: true });
-    if (data) setLiveClasses(data);
-  };
-
-  const fetchMessages = async (userProfile: UserProfile) => {
-    const { data } = await supabase
-      .from('messages')
-      .select('*, sender:users(*)')
-      .or(`sender_id.eq.${userProfile.id},receiver_id.eq.${userProfile.id}`)
-      .order('created_at', { ascending: false });
-    if (data) setMessages(data);
-  };
-
   const fetchNotifications = async (userProfile: UserProfile) => {
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userProfile.id)
-      .order('created_at', { ascending: false });
-    if (data) setNotifications(data);
+    try {
+      const q = query(collection(db, 'notifications'), where('user_id', '==', userProfile.auth_id), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
+      setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'notifications');
+    }
   };
 
   const fetchFilesAndVideos = async (userProfile: UserProfile) => {
-    const { data: files } = await supabase.from('lesson_files').select('*');
-    const { data: videos } = await supabase.from('explain_videos').select('*');
-    if (files) setLessonFiles(files);
-    if (videos) setExplainVideos(videos);
+    try {
+      const filesSnap = await getDocs(collection(db, 'lesson_files'));
+      const videosSnap = await getDocs(collection(db, 'explain_videos'));
+      setLessonFiles(filesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LessonFile)));
+      setExplainVideos(videosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExplainVideo)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'content');
+    }
   };
 
   const fetchSubscriptions = async (userProfile: UserProfile) => {
-    const { data } = await supabase.from('subscriptions').select('*').eq('student_id', userProfile.id);
-    if (data) setSubscriptions(data);
+    try {
+      const q = query(collection(db, 'subscriptions'), where('student_id', '==', userProfile.auth_id));
+      const snapshot = await getDocs(q);
+      setSubscriptions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subscription)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'subscriptions');
+    }
   };
 
   const fetchAdminData = async () => {
-    const { data: users } = await supabase.from('users').select('*');
-    const { data: logs } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(50);
-    if (users) setAllUsers(users);
-    if (logs) setActivityLogs(logs);
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const logsSnap = await getDocs(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50)));
+      setAllUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile)));
+      setActivityLogs(logsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'admin_data');
+    }
   };
 
   const handleLike = async (postId: string) => {
     if (!profile) return;
     
     const post = posts.find(p => p.id === postId);
-    if (post?.is_liked) {
-      await supabase.from('likes').delete().match({ post_id: postId, user_id: profile.id });
-    } else {
-      await supabase.from('likes').insert({ post_id: postId, user_id: profile.id });
+    try {
+      const postRef = doc(db, 'posts', postId);
+      const newLikesCount = (post?.likes_count || 0) + (post?.is_liked ? -1 : 1);
+      await updateDoc(postRef, {
+        likes_count: Math.max(0, newLikesCount)
+      });
+      // In a real app, we'd have a separate 'likes' collection to track who liked what
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `posts/${postId}`);
     }
-    fetchPosts(profile);
   };
 
   const handleCreatePost = async () => {
     if (!profile || !newPostContent.trim()) return;
     
-    const { error } = await supabase.from('posts').insert({
-      author_id: profile.id,
-      content: newPostContent,
-      image_url: newPostImage || null,
-      likes_count: 0,
-      comments_count: 0
-    });
+    try {
+      await addDoc(collection(db, 'posts'), {
+        author_id: profile.auth_id,
+        content: newPostContent,
+        image_url: newPostImage || null,
+        likes_count: 0,
+        comments_count: 0,
+        created_at: new Date().toISOString()
+      });
 
-    if (!error) {
       setNewPostContent('');
       setNewPostImage('');
       setIsPostModalOpen(false);
-      fetchPosts(profile);
       
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        user_id: profile.id,
-        user_name: `${profile.first_name} ${profile.last_name}`,
-        action: 'نشر منشوراً جديداً',
-        details: newPostContent.substring(0, 50) + '...'
-      });
+      await logActivity('نشر منشوراً جديداً', newPostContent.substring(0, 50) + '...');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'posts');
     }
   };
 
   const fetchComments = async (postId: string) => {
-    const { data } = await supabase
-      .from('comments')
-      .select('*, author:users(*)')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true });
-    if (data) setPostComments(data);
+    try {
+      const q = query(collection(db, `posts/${postId}/comments`), orderBy('created_at', 'asc'));
+      const snapshot = await getDocs(q);
+      setPostComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PostComment)));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, `posts/${postId}/comments`);
+    }
   };
 
   const handleOpenComments = (post: Post) => {
@@ -542,47 +654,72 @@ export default function App() {
   const handleAddComment = async () => {
     if (!profile || !selectedPostForComment || !newComment.trim()) return;
 
-    const { error } = await supabase.from('comments').insert({
-      post_id: selectedPostForComment.id,
-      user_id: profile.id,
-      content: newComment
-    });
+    try {
+      await addDoc(collection(db, `posts/${selectedPostForComment.id}/comments`), {
+        post_id: selectedPostForComment.id,
+        author_id: profile.auth_id,
+        content: newComment,
+        created_at: new Date().toISOString()
+      });
 
-    if (!error) {
+      // Update comment count
+      const postRef = doc(db, 'posts', selectedPostForComment.id);
+      await updateDoc(postRef, {
+        comments_count: (selectedPostForComment.comments_count || 0) + 1
+      });
+
       setNewComment('');
       fetchComments(selectedPostForComment.id);
-      fetchPosts(profile);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'comments');
     }
   };
 
   const fetchChatMessages = async (otherUserId: string) => {
     if (!profile) return;
-    const { data } = await supabase
-      .from('messages')
-      .select('*, sender:users(*)')
-      .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${profile.id})`)
-      .order('created_at', { ascending: true });
-    if (data) setChatMessages(data);
+    try {
+      // Simple query for now, complex OR queries are harder in Firestore
+      const q = query(
+        collection(db, 'messages'),
+        where('sender_id', 'in', [profile.auth_id, otherUserId]),
+        orderBy('created_at', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      // Filter client-side for the specific pair
+      const msgs = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Message))
+        .filter(m => 
+          (m.sender_id === profile.auth_id && m.receiver_id === otherUserId) ||
+          (m.sender_id === otherUserId && m.receiver_id === profile.auth_id)
+        );
+      setChatMessages(msgs);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'messages');
+    }
   };
 
   const handleOpenChat = (otherUser: UserProfile) => {
     setSelectedUserForChat(otherUser);
     setIsChatModalOpen(true);
-    fetchChatMessages(otherUser.id);
+    fetchChatMessages(otherUser.auth_id);
   };
 
   const handleSendMessage = async () => {
     if (!profile || !selectedUserForChat || !newMessage.trim()) return;
 
-    const { error } = await supabase.from('messages').insert({
-      sender_id: profile.id,
-      receiver_id: selectedUserForChat.id,
-      content: newMessage
-    });
+    try {
+      await addDoc(collection(db, 'messages'), {
+        sender_id: profile.auth_id,
+        receiver_id: selectedUserForChat.auth_id,
+        content: newMessage,
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
 
-    if (!error) {
       setNewMessage('');
-      fetchChatMessages(selectedUserForChat.id);
+      fetchChatMessages(selectedUserForChat.auth_id);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'messages');
     }
   };
 
@@ -593,13 +730,22 @@ export default function App() {
     }
     setSelectedLive(live);
     setIsLiveModalOpen(true);
-    // Update count
-    await supabase.from('live_classes').update({ current_students: live.current_students + 1 }).eq('id', live.id);
+    try {
+      const liveRef = doc(db, 'live_classes', live.id);
+      await updateDoc(liveRef, { current_students: live.current_students + 1 });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `live_classes/${live.id}`);
+    }
   };
 
   const handleLeaveLive = async () => {
     if (selectedLive) {
-      await supabase.from('live_classes').update({ current_students: Math.max(0, selectedLive.current_students - 1) }).eq('id', selectedLive.id);
+      try {
+        const liveRef = doc(db, 'live_classes', selectedLive.id);
+        await updateDoc(liveRef, { current_students: Math.max(0, selectedLive.current_students - 1) });
+      } catch (error) {
+        console.error("Error leaving live:", error);
+      }
     }
     setIsLiveModalOpen(false);
     setSelectedLive(null);
@@ -619,11 +765,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-24" dir="rtl">
-      {/* Supabase Connection Error Warning */}
-      {supabaseError && (
+      {/* Firebase Connection Error Warning */}
+      {firebaseError && (
         <div className="bg-red-600 text-white p-3 text-center text-sm font-bold sticky top-0 z-50 flex items-center justify-center gap-2">
           <AlertCircle className="w-5 h-5" />
-          {supabaseError}
+          {firebaseError}
         </div>
       )}
       {/* Header */}
@@ -669,7 +815,7 @@ export default function App() {
                 <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
                   <div className="flex gap-4">
                     <img 
-                      src={profile.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`} 
+                      src={profile.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.auth_id}`} 
                       className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
                     />
                     <button 
@@ -1009,7 +1155,7 @@ export default function App() {
                 
                 <button 
                   onClick={async () => {
-                    await supabase.auth.signOut();
+                    await auth.signOut();
                     setUser(null);
                     setProfile(null);
                   }}

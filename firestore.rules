@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: users
+    // Fields: auth_id, first_name, last_name, role, account_status, profile_image, bio, rating, created_at
+    //
+    // Collection: posts
+    // Fields: author_id, content, image_url, video_url, likes_count, comments_count, created_at
+    //
+    // Collection: messages
+    // Fields: sender_id, receiver_id, content, is_read, created_at
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "wahablila31000@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['auth_id', 'first_name', 'last_name', 'role', 'account_status', 'created_at']) &&
+             data.first_name is string && data.first_name.size() < 50 &&
+             data.last_name is string && data.last_name.size() < 50 &&
+             data.role in ['student', 'teacher', 'admin'] &&
+             data.account_status in ['active', 'pending', 'suspended'];
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role != 'admin' || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) &&
+                      (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    // Posts
+    match /posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.author_id == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.author_id == request.auth.uid || isAdmin());
+      
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && request.resource.data.author_id == request.auth.uid;
+        allow update, delete: if isAuthenticated() && (resource.data.author_id == request.auth.uid || isAdmin());
+      }
+    }
+
+    // Live Classes
+    match /live_classes/{classId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (request.resource.data.teacher_id == request.auth.uid || isAdmin());
+      allow update, delete: if isAuthenticated() && (resource.data.teacher_id == request.auth.uid || isAdmin());
+    }
+
+    // Messages
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (resource.data.sender_id == request.auth.uid || resource.data.receiver_id == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.sender_id == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.receiver_id == request.auth.uid && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['is_read']);
+    }
+
+    // Lesson Files
+    match /lesson_files/{fileId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (request.resource.data.teacher_id == request.auth.uid || isAdmin());
+      allow update, delete: if isAuthenticated() && (resource.data.teacher_id == request.auth.uid || isAdmin());
+    }
+
+    // Explain Videos
+    match /explain_videos/{videoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (request.resource.data.teacher_id == request.auth.uid || isAdmin());
+      allow update, delete: if isAuthenticated() && (resource.data.teacher_id == request.auth.uid || isAdmin());
+    }
+
+    // Subscriptions
+    match /subscriptions/{subId} {
+      allow read: if isAuthenticated() && (resource.data.student_id == request.auth.uid || resource.data.teacher_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.student_id == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+  }
+}
