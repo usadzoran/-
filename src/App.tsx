@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, 
@@ -16,45 +16,53 @@ import {
   BookOpen,
   Users,
   CheckCircle,
-  Clock
+  Clock,
+  Heart,
+  Send,
+  MoreVertical,
+  Hand,
+  Mic,
+  MicOff,
+  ShieldCheck,
+  Star,
+  Download,
+  PlayCircle,
+  ArrowRight,
+  Settings,
+  BarChart3,
+  UserCheck,
+  AlertCircle,
+  Info,
 } from 'lucide-react';
-import { db, auth } from './firebase';
+import { supabase } from './lib/supabase';
 import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  serverTimestamp,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  limit
-} from 'firebase/firestore';
-import { 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  createUserWithEmailAndPassword
-} from 'firebase/auth';
+  UserProfile, 
+  UserRole, 
+  Post, 
+  LiveClass, 
+  Message, 
+  Subscription, 
+  LessonFile, 
+  ExplainVideo, 
+  Notification 
+} from './types';
 
 // --- Helper for Activity Logging ---
 const logActivity = async (action: string, details: string = '') => {
-  if (!auth.currentUser) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
   try {
-    await addDoc(collection(db, 'activity_logs'), {
-      user_id: auth.currentUser.uid,
-      user_name: auth.currentUser.email,
+    await supabase.from('activity_logs').insert({
+      user_id: user.id,
+      user_name: user.email,
       action,
       details,
-      timestamp: serverTimestamp()
+      timestamp: new Date().toISOString()
     });
   } catch (e) {
     console.error("Error logging activity:", e);
   }
 };
-import { UserProfile, UserRole } from './types';
 
 // --- Components ---
 
@@ -64,7 +72,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 text-center"
+      className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-6 text-center overflow-y-auto"
     >
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
@@ -73,9 +81,9 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         className="mb-8"
       >
         <img 
-          src="https://picsum.photos/seed/teacher-whiteboard-online/800/600" 
-          alt="Teacher with whiteboard and students online" 
-          className="w-full max-w-md rounded-2xl shadow-2xl"
+          src="https://picsum.photos/seed/allimni-edu/800/600" 
+          alt="Educational Platform" 
+          className="w-full max-w-md rounded-3xl shadow-2xl border-4 border-emerald-50"
           referrerPolicy="no-referrer"
         />
       </motion.div>
@@ -84,7 +92,7 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="text-6xl font-bold text-emerald-600 mb-4 font-sans"
+        className="text-7xl font-black text-emerald-600 mb-2 font-sans tracking-tighter"
       >
         علّمني
       </motion.h1>
@@ -93,113 +101,34 @@ const SplashScreen = ({ onFinish }: { onFinish: () => void }) => {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.6 }}
-        className="text-xl text-slate-600 mb-6 max-w-sm"
+        className="text-2xl text-slate-600 mb-8 font-medium"
       >
-        تعلم مع أفضل الأساتذة مباشرة و بسهولة
+        مستقبلك يبدأ بدرس واحد
       </motion.p>
 
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.7 }}
-        className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 mb-10 max-w-md"
+        className="bg-emerald-50/50 p-8 rounded-[2.5rem] border border-emerald-100 mb-10 max-w-lg backdrop-blur-sm"
       >
-        <p className="text-slate-700 leading-relaxed text-sm md:text-base">
-          منصة "علّمني" هي بوابتك المتكاملة للتعليم عن بعد، حيث نجمع بين نخبة من الأساتذة المتميزين والطلاب في بيئة تفاعلية متطورة. نوفر لك دروساً مباشرة، ملفات تعليمية، وفيديوهات توضيحية لتسهيل مسيرتك الدراسية وضمان تفوقك من أي مكان وفي أي وقت.
+        <p className="text-slate-700 leading-relaxed text-lg">
+          مرحباً بك في "علّمني"، المنصة التعليمية الأذكى في العالم العربي. نربطك بأفضل الأساتذة في دروس مباشرة وتفاعلية، مع مكتبة شاملة من الملفات والفيديوهات المصممة خصيصاً لتفوقك.
         </p>
       </motion.div>
 
-      <div className="flex gap-4 w-full max-w-xs mb-12">
+      <div className="flex flex-col gap-4 w-full max-w-xs mb-12">
         <button 
           onClick={onFinish}
-          className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors"
+          className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-bold text-xl shadow-xl shadow-emerald-200 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
-          ابدأ الآن
+          ابدأ رحلة التعلم
         </button>
       </div>
 
-      {/* Team Section */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        className="w-full max-w-md md:max-w-2xl overflow-y-auto max-h-[45vh] px-4 custom-scrollbar"
-      >
-        <h3 className="text-xl font-bold text-slate-800 mb-6 border-r-4 border-emerald-500 pr-3 text-right">فريق العمل</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-8">
-          {/* Toufik */}
-          <motion.div 
-            whileHover={{ scale: 1.02, x: -4 }}
-            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
-          >
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
-              <img 
-                src="https://images.unsplash.com/photo-1566492031773-4f4e44671857?fit=crop&w=200&h=200" 
-                alt="توفيق" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="text-right flex-1">
-              <h4 className="font-bold text-slate-900">توفيق</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">مختص في المعلوماتية و الرياضيات</p>
-            </div>
-          </motion.div>
-
-          {/* Abdelwahab */}
-          <motion.div 
-            whileHover={{ scale: 1.02, x: -4 }}
-            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
-          >
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
-              <img 
-                src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?fit=crop&w=200&h=200" 
-                alt="عبدالوهاب" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="text-right flex-1">
-              <h4 className="font-bold text-slate-900">عبدالوهاب</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">مختص بالبرمجة و صناعة المواقع و التطبيقات</p>
-            </div>
-          </motion.div>
-
-          {/* Fictional 1: Sarah */}
-          <motion.div 
-            whileHover={{ scale: 1.02, x: -4 }}
-            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
-          >
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
-              <img 
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" 
-                alt="سارة" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="text-right flex-1">
-              <h4 className="font-bold text-slate-900">سارة</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">مختصة في التصميم الجرافيكي وواجهة المستخدم (UI/UX)</p>
-            </div>
-          </motion.div>
-
-          {/* Fictional 2: Omar */}
-          <motion.div 
-            whileHover={{ scale: 1.02, x: -4 }}
-            className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center gap-4 flex-row-reverse cursor-default"
-          >
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 border-2 border-emerald-100">
-              <img 
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Omar" 
-                alt="عمر" 
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="text-right flex-1">
-              <h4 className="font-bold text-slate-900">عمر</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">مختص في العلوم الطبيعية والفيزياء</p>
-            </div>
-          </motion.div>
-        </div>
-      </motion.div>
+      <div className="text-slate-400 text-sm font-medium">
+        بواسطة فريق علّمني المبدع • 2026
+      </div>
     </motion.div>
   );
 };
@@ -219,33 +148,25 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
     
     try {
       if (isLogin) {
-        try {
-          await signInWithEmailAndPassword(auth, email, password);
-          onAuthSuccess(auth.currentUser);
-        } catch (error: any) {
-          // Special case for admin: if login fails but it's the admin email, try to sign up
-          if (email === 'wahablila31000@gmail.com') {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            onAuthSuccess(userCredential.user);
-          } else {
-            throw error;
-          }
-        }
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        onAuthSuccess(data.user);
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const firebaseUser = userCredential.user;
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
         
-        // Create user profile in Firestore
-        const isMainAdmin = email === 'wahablila31000@gmail.com';
-        await setDoc(doc(db, 'users', firebaseUser.uid), {
-          auth_id: firebaseUser.uid,
-          first_name: isMainAdmin ? 'المدير' : firstName,
-          last_name: isMainAdmin ? 'العام' : lastName,
-          role: isMainAdmin ? 'admin' : role,
-          account_status: isMainAdmin ? 'active' : (role === 'teacher' ? 'pending' : 'active')
-        });
-        
-        onAuthSuccess(firebaseUser);
+        if (data.user) {
+          const isMainAdmin = email === 'wahablila31000@gmail.com';
+          await supabase.from('users').insert({
+            auth_id: data.user.id,
+            first_name: isMainAdmin ? 'المدير' : firstName,
+            last_name: isMainAdmin ? 'العام' : lastName,
+            role: isMainAdmin ? 'admin' : role,
+            account_status: isMainAdmin ? 'active' : (role === 'teacher' ? 'pending' : 'active'),
+            created_at: new Date().toISOString()
+          });
+        }
+        onAuthSuccess(data.user);
       }
     } catch (error: any) {
       alert(error.message);
@@ -255,39 +176,45 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8">
-        <h2 className="text-3xl font-bold text-slate-900 mb-2 text-center">
-          {isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans" dir="rtl">
+      <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl shadow-slate-200 p-10 border border-slate-100">
+        <div className="flex justify-center mb-8">
+          <div className="w-20 h-20 bg-emerald-600 rounded-3xl flex items-center justify-center shadow-lg shadow-emerald-200 rotate-3">
+            <BookOpen className="text-white w-10 h-10 -rotate-3" />
+          </div>
+        </div>
+        
+        <h2 className="text-4xl font-black text-slate-900 mb-2 text-center tracking-tight">
+          {isLogin ? 'مرحباً بك!' : 'انضم إلينا'}
         </h2>
-        <p className="text-slate-500 text-center mb-8">
-          {isLogin ? 'مرحباً بك مجدداً في علّمني' : 'انضم إلى مجتمعنا التعليمي'}
+        <p className="text-slate-500 text-center mb-10 text-lg">
+          {isLogin ? 'سجل دخولك لمتابعة دروسك' : 'ابدأ مسيرتك التعليمية اليوم'}
         </p>
 
         {!isLogin && (
-          <div className="flex gap-2 mb-6 p-1 bg-slate-100 rounded-xl">
+          <div className="flex gap-2 mb-8 p-1.5 bg-slate-100 rounded-2xl">
             <button 
               onClick={() => setRole('student')}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all ${role === 'student' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`}
+              className={`flex-1 py-3 rounded-xl font-bold transition-all ${role === 'student' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}
             >
               طالب
             </button>
             <button 
               onClick={() => setRole('teacher')}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all ${role === 'teacher' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`}
+              className={`flex-1 py-3 rounded-xl font-bold transition-all ${role === 'teacher' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}
             >
               أستاذ
             </button>
           </div>
         )}
 
-        <form onSubmit={handleAuth} className="space-y-4">
+        <form onSubmit={handleAuth} className="space-y-5">
           {!isLogin && (
             <div className="grid grid-cols-2 gap-4">
               <input 
                 type="text" 
-                placeholder="الاسم الأول" 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="الاسم" 
+                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-emerald-500 transition-all"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
@@ -295,7 +222,7 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
               <input 
                 type="text" 
                 placeholder="اللقب" 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-emerald-500 transition-all"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
@@ -305,7 +232,7 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
           <input 
             type="email" 
             placeholder="البريد الإلكتروني" 
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-emerald-500 transition-all"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -313,7 +240,7 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
           <input 
             type="password" 
             placeholder="كلمة المرور" 
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-emerald-500 transition-all"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -321,73 +248,21 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 mt-4"
           >
-            {loading ? 'جاري التحميل...' : (isLogin ? 'دخول' : 'تسجيل')}
+            {loading ? 'جاري التحميل...' : (isLogin ? 'دخول' : 'إنشاء حساب')}
           </button>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="mt-10 text-center">
           <button 
             onClick={() => setIsLogin(!isLogin)}
-            className="text-emerald-600 font-medium hover:underline"
+            className="text-emerald-600 font-bold text-lg hover:underline decoration-2 underline-offset-4"
           >
-            {isLogin ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب بالفعل؟ سجل دخولك'}
+            {isLogin ? 'ليس لديك حساب؟ سجل مجاناً' : 'لديك حساب بالفعل؟ سجل دخولك'}
           </button>
         </div>
       </div>
-    </div>
-  );
-};
-
-const Navbar = ({ profile }: { profile: UserProfile | null }) => {
-  return (
-    <nav className="fixed top-0 left-0 right-0 bg-white border-b border-slate-100 z-40 px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-          <BookOpen className="text-emerald-600 w-6 h-6" />
-        </div>
-        <span className="text-xl font-bold text-slate-900">علّمني</span>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <button className="p-2 text-slate-500 hover:bg-slate-50 rounded-full relative">
-          <Bell className="w-6 h-6" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
-        <div className="w-10 h-10 rounded-full bg-slate-200 overflow-hidden border-2 border-emerald-500">
-          <img 
-            src={profile?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.auth_id}`} 
-            alt="Profile" 
-            className="w-full h-full object-cover"
-          />
-        </div>
-      </div>
-    </nav>
-  );
-};
-
-const BottomNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (tab: string) => void }) => {
-  const tabs = [
-    { id: 'home', icon: Home, label: 'الرئيسية' },
-    { id: 'live', icon: Video, label: 'مباشر' },
-    { id: 'messages', icon: MessageSquare, label: 'رسائل' },
-    { id: 'files', icon: FileText, label: 'ملفات' },
-    { id: 'profile', icon: User, label: 'حسابي' },
-  ];
-
-  return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-3 flex items-center justify-between z-40">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
-          className={`flex flex-col items-center gap-1 transition-colors ${activeTab === tab.id ? 'text-emerald-600' : 'text-slate-400'}`}
-        >
-          <tab.icon className={`w-6 h-6 ${activeTab === tab.id ? 'fill-emerald-600/10' : ''}`} />
-          <span className="text-[10px] font-medium">{tab.label}</span>
-        </button>
-      ))}
     </div>
   );
 };
@@ -399,20 +274,42 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [showAdmin, setShowAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [liveClasses, setLiveClasses] = useState<any[]>([]);
-
+  
+  // Data States
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [lessonFiles, setLessonFiles] = useState<LessonFile[]>([]);
+  const [explainVideos, setExplainVideos] = useState<ExplainVideo[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+
+  // UI States
+  const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
+  const [selectedLive, setSelectedLive] = useState<LiveClass | null>(null);
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [selectedUserForChat, setSelectedUserForChat] = useState<UserProfile | null>(null);
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [selectedPostForComment, setSelectedPostForComment] = useState<Post | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [postComments, setPostComments] = useState<Comment[]>([]);
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostImage, setNewPostImage] = useState('');
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(false);
+  const [isMicApproved, setIsMicApproved] = useState(false);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        await fetchProfile(firebaseUser.uid, firebaseUser.email || undefined);
-        fetchData();
-        logActivity('دخول', 'قام المستخدم بتسجيل الدخول');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        await fetchProfile(session.user.id);
       } else {
         setUser(null);
         setProfile(null);
@@ -420,244 +317,352 @@ export default function App() {
       }
     });
 
-    // Handle direct admin access link
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('access') === 'admin_wahab') {
-      signInWithEmailAndPassword(auth, 'wahablila31000@gmail.com', 'vampirewahab31').then(() => {
-        setShowAdmin(true);
-        window.history.replaceState({}, document.title, window.location.pathname);
-      });
-    }
-
-    return () => unsubscribeAuth();
+    return () => subscription.unsubscribe();
   }, []);
 
-  const fetchData = () => {
-    // Real-time Posts
-    const postsQuery = query(collection(db, 'posts'), orderBy('created_at', 'desc'));
-    const unsubscribePosts = onSnapshot(postsQuery, (snapshot) => {
-      const postsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setPosts(postsData);
-    });
-
-    // Real-time Activity Logs (for Admin)
-    let unsubscribeLogs = () => {};
-    if (profile?.role === 'admin') {
-      const logsQuery = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50));
-      unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-        const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setActivityLogs(logsData);
-      });
-    }
-
-    return () => {
-      unsubscribePosts();
-      unsubscribeLogs();
-    };
-  };
-
-  const fetchProfile = async (authId: string, userEmail?: string) => {
-    const docRef = doc(db, 'users', authId);
-    const docSnap = await getDoc(docRef);
+  const fetchProfile = async (authId: string) => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId)
+      .single();
     
-    if (docSnap.exists()) {
-      const data = docSnap.data() as UserProfile;
-      // Force admin role for the specific email
-      if (userEmail === 'wahablila31000@gmail.com' && data.role !== 'admin') {
-        await updateDoc(docRef, { role: 'admin' });
-        setProfile({ ...data, role: 'admin' });
-      } else {
-        setProfile(data);
-      }
-    } else if (userEmail === 'wahablila31000@gmail.com') {
-      const newProfile = {
-        auth_id: authId,
-        first_name: 'المدير',
-        last_name: 'العام',
-        role: 'admin' as UserRole,
-        account_status: 'active'
-      };
-      await setDoc(docRef, newProfile);
-      setProfile(newProfile as UserProfile);
+    if (data) {
+      setProfile(data);
+      setupRealtime(data);
+      fetchAllData(data);
     }
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (user) {
-      logActivity('تصفح', `انتقل إلى تبويب: ${activeTab}`);
+  const setupRealtime = (userProfile: UserProfile) => {
+    // Real-time Posts
+    supabase.channel('posts-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => fetchPosts(userProfile))
+      .subscribe();
+
+    // Real-time Live Classes
+    supabase.channel('live-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_classes' }, () => fetchLiveClasses())
+      .subscribe();
+
+    // Real-time Messages
+    supabase.channel('messages-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userProfile.id}` }, (payload) => {
+        setMessages(prev => [payload.new as Message, ...prev]);
+        fetchNotifications(userProfile);
+      })
+      .subscribe();
+
+    // Real-time Notifications
+    supabase.channel('notifications-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userProfile.id}` }, () => fetchNotifications(userProfile))
+      .subscribe();
+  };
+
+  const fetchAllData = (userProfile: UserProfile) => {
+    fetchPosts(userProfile);
+    fetchLiveClasses();
+    fetchMessages(userProfile);
+    fetchNotifications(userProfile);
+    fetchFilesAndVideos(userProfile);
+    fetchSubscriptions(userProfile);
+    if (userProfile.role === 'admin') {
+      fetchAdminData();
     }
-  }, [activeTab]);
+  };
 
-  if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
-  }
+  const fetchPosts = async (userProfile: UserProfile) => {
+    // If student, filter by subscriptions
+    let query = supabase.from('posts').select('*, author:users(*)').order('created_at', { ascending: false });
+    
+    const { data } = await query;
+    if (data) setPosts(data);
+  };
 
-  if (!user) {
-    return <AuthScreen onAuthSuccess={(u) => {
-      setUser(u);
-      fetchProfile(u.id, u.email);
-    }} />;
-  }
+  const fetchLiveClasses = async () => {
+    const { data } = await supabase.from('live_classes').select('*, teacher:users(*)').order('start_time', { ascending: true });
+    if (data) setLiveClasses(data);
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  const fetchMessages = async (userProfile: UserProfile) => {
+    const { data } = await supabase
+      .from('messages')
+      .select('*, sender:users(*)')
+      .or(`sender_id.eq.${userProfile.id},receiver_id.eq.${userProfile.id}`)
+      .order('created_at', { ascending: false });
+    if (data) setMessages(data);
+  };
+
+  const fetchNotifications = async (userProfile: UserProfile) => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userProfile.id)
+      .order('created_at', { ascending: false });
+    if (data) setNotifications(data);
+  };
+
+  const fetchFilesAndVideos = async (userProfile: UserProfile) => {
+    const { data: files } = await supabase.from('lesson_files').select('*');
+    const { data: videos } = await supabase.from('explain_videos').select('*');
+    if (files) setLessonFiles(files);
+    if (videos) setExplainVideos(videos);
+  };
+
+  const fetchSubscriptions = async (userProfile: UserProfile) => {
+    const { data } = await supabase.from('subscriptions').select('*').eq('student_id', userProfile.id);
+    if (data) setSubscriptions(data);
+  };
+
+  const fetchAdminData = async () => {
+    const { data: users } = await supabase.from('users').select('*');
+    const { data: logs } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(50);
+    if (users) setAllUsers(users);
+    if (logs) setActivityLogs(logs);
+  };
+
+  const handleLike = async (postId: string) => {
+    if (!profile) return;
+    
+    const post = posts.find(p => p.id === postId);
+    if (post?.is_liked) {
+      await supabase.from('likes').delete().match({ post_id: postId, user_id: profile.id });
+    } else {
+      await supabase.from('likes').insert({ post_id: postId, user_id: profile.id });
+    }
+    fetchPosts(profile);
+  };
+
+  const handleCreatePost = async () => {
+    if (!profile || !newPostContent.trim()) return;
+    
+    const { error } = await supabase.from('posts').insert({
+      author_id: profile.id,
+      content: newPostContent,
+      image_url: newPostImage || null,
+      likes_count: 0,
+      comments_count: 0
+    });
+
+    if (!error) {
+      setNewPostContent('');
+      setNewPostImage('');
+      setIsPostModalOpen(false);
+      fetchPosts(profile);
+      
+      // Log activity
+      await supabase.from('activity_logs').insert({
+        user_id: profile.id,
+        user_name: `${profile.first_name} ${profile.last_name}`,
+        action: 'نشر منشوراً جديداً',
+        details: newPostContent.substring(0, 50) + '...'
+      });
+    }
+  };
+
+  const fetchComments = async (postId: string) => {
+    const { data } = await supabase
+      .from('comments')
+      .select('*, author:users(*)')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    if (data) setPostComments(data);
+  };
+
+  const handleOpenComments = (post: Post) => {
+    setSelectedPostForComment(post);
+    setIsCommentModalOpen(true);
+    fetchComments(post.id);
+  };
+
+  const handleAddComment = async () => {
+    if (!profile || !selectedPostForComment || !newComment.trim()) return;
+
+    const { error } = await supabase.from('comments').insert({
+      post_id: selectedPostForComment.id,
+      user_id: profile.id,
+      content: newComment
+    });
+
+    if (!error) {
+      setNewComment('');
+      fetchComments(selectedPostForComment.id);
+      fetchPosts(profile);
+    }
+  };
+
+  const fetchChatMessages = async (otherUserId: string) => {
+    if (!profile) return;
+    const { data } = await supabase
+      .from('messages')
+      .select('*, sender:users(*)')
+      .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${profile.id})`)
+      .order('created_at', { ascending: true });
+    if (data) setChatMessages(data);
+  };
+
+  const handleOpenChat = (otherUser: UserProfile) => {
+    setSelectedUserForChat(otherUser);
+    setIsChatModalOpen(true);
+    fetchChatMessages(otherUser.id);
+  };
+
+  const handleSendMessage = async () => {
+    if (!profile || !selectedUserForChat || !newMessage.trim()) return;
+
+    const { error } = await supabase.from('messages').insert({
+      sender_id: profile.id,
+      receiver_id: selectedUserForChat.id,
+      content: newMessage
+    });
+
+    if (!error) {
+      setNewMessage('');
+      fetchChatMessages(selectedUserForChat.id);
+    }
+  };
+
+  const handleJoinLive = async (live: LiveClass) => {
+    if (live.current_students >= 20) {
+      alert("عذراً، الجلسة مكتملة (الحد الأقصى 20 طالب)");
+      return;
+    }
+    setSelectedLive(live);
+    setIsLiveModalOpen(true);
+    // Update count
+    await supabase.from('live_classes').update({ current_students: live.current_students + 1 }).eq('id', live.id);
+  };
+
+  const handleLeaveLive = async () => {
+    if (selectedLive) {
+      await supabase.from('live_classes').update({ current_students: Math.max(0, selectedLive.current_students - 1) }).eq('id', selectedLive.id);
+    }
+    setIsLiveModalOpen(false);
+    setSelectedLive(null);
+    setIsHandRaised(false);
+    setIsMicOn(false);
+  };
+
+  if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  if (!user) return <AuthScreen onAuthSuccess={(u) => setUser(u)} />;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+
+  const isAdmin = profile?.role === 'admin';
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 pt-16" dir="rtl">
-      <Navbar profile={profile} />
-      
-      {showAdmin && profile?.role === 'admin' ? (
-        <div className="max-w-4xl mx-auto p-4 space-y-8">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-slate-900">لوحة التحكم</h1>
-            <button onClick={() => setShowAdmin(false)} className="text-emerald-600 font-bold">العودة للتطبيق</button>
+    <div className="min-h-screen bg-slate-50 font-sans pb-24" dir="rtl">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
+            <BookOpen className="text-white w-6 h-6" />
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-              <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-emerald-600" />
-                النشاط المباشر (Realtime)
-              </h3>
-              <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar pr-2">
-                {activityLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 border-b border-slate-50 pb-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 mt-2 animate-pulse"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-slate-800">{log.user_name}</p>
-                      <p className="text-xs text-slate-600">{log.action}: {log.details}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleTimeString('ar-EG') : 'الآن'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {activityLogs.length === 0 && (
-                  <p className="text-center text-slate-400 py-8">لا يوجد نشاط حالياً</p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
-              <p className="text-slate-500 text-sm mb-1">الزيارات اليومية</p>
-              <h3 className="text-4xl font-bold text-emerald-600">3,500</h3>
-              <div className="mt-4 w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-3/4"></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-900">طلبات انضمام الأساتذة</h3>
-              <button className="text-emerald-600 text-sm font-bold">عرض الكل</button>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=admin${i}`} alt="User" className="w-10 h-10 rounded-full bg-slate-100" />
-                    <div>
-                      <h4 className="font-bold text-slate-900">أ. كمال بن يوسف</h4>
-                      <p className="text-xs text-slate-500">مادة العلوم الطبيعية</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold">قبول</button>
-                    <button className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold">رفض</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">علّمني</h1>
         </div>
-      ) : (
-        <main className="max-w-2xl mx-auto p-4">
+        
+        <div className="flex items-center gap-3">
+          <button className="p-2.5 text-slate-500 hover:bg-slate-100 rounded-2xl relative transition-colors">
+            <Bell className="w-6 h-6" />
+            {notifications.some(n => !n.is_read) && (
+              <span className="absolute top-2.5 right-2.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+            )}
+          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => setActiveTab('admin')}
+              className={`p-2.5 rounded-2xl transition-colors ${activeTab === 'admin' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-100'}`}
+            >
+              <ShieldCheck className="w-6 h-6" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-3xl mx-auto p-4 md:p-6">
         <AnimatePresence mode="wait">
           {activeTab === 'home' && (
             <motion.div 
               key="home"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
-              {/* Stories/Quick Actions */}
-              <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-                <div className="flex-shrink-0 flex flex-col items-center gap-2">
-                  <div className="w-16 h-16 rounded-full border-2 border-emerald-500 p-1">
-                    <div className="w-full h-full bg-emerald-100 rounded-full flex items-center justify-center">
-                      <Plus className="text-emerald-600" />
-                    </div>
+              {/* Post Creator (Teacher Only) */}
+              {profile?.role === 'teacher' && (
+                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+                  <div className="flex gap-4">
+                    <img 
+                      src={profile.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.id}`} 
+                      className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
+                    />
+                    <button 
+                      onClick={() => setIsPostModalOpen(true)}
+                      className="flex-1 bg-slate-50 rounded-2xl px-6 text-right text-slate-400 font-medium hover:bg-slate-100 transition-colors"
+                    >
+                      ماذا تريد أن تشارك مع طلابك اليوم؟
+                    </button>
                   </div>
-                  <span className="text-xs font-medium">إضافة</span>
                 </div>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex-shrink-0 flex flex-col items-center gap-2">
-                    <div className="w-16 h-16 rounded-full border-2 border-slate-200 p-1">
-                      <img 
-                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`} 
-                        alt="User" 
-                        className="w-full h-full rounded-full bg-slate-100"
-                      />
-                    </div>
-                    <span className="text-xs font-medium">أستاذ {i}</span>
-                  </div>
-                ))}
-              </div>
+              )}
 
-              {/* Feed Posts */}
-              {posts.length > 0 ? posts.map((post) => (
-                <div key={post.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+              {/* Feed */}
+              {posts.map((post) => (
+                <div key={post.id} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
                       <img 
                         src={post.author?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author_id}`} 
-                        alt="Author" 
-                        className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200"
+                        className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
                       />
                       <div>
-                        <h4 className="font-bold text-slate-900">{post.author?.first_name} {post.author?.last_name}</h4>
-                        <p className="text-xs text-slate-500">{new Date(post.created_at).toLocaleDateString('ar-EG')} • منشور</p>
+                        <h4 className="font-bold text-slate-900 text-lg">{post.author?.first_name} {post.author?.last_name}</h4>
+                        <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(post.created_at).toLocaleDateString('ar-EG')}
+                        </p>
                       </div>
                     </div>
+                    <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl">
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
                   </div>
                   
-                  <div className="px-4 pb-4">
-                    <p className="text-slate-700 leading-relaxed mb-4">{post.content}</p>
+                  <div className="px-6 pb-6">
+                    <p className="text-slate-700 leading-relaxed text-lg mb-6 whitespace-pre-wrap">{post.content}</p>
                     {post.image_url && (
                       <img 
                         src={post.image_url} 
-                        alt="Post content" 
-                        className="w-full h-64 object-cover rounded-2xl mb-4"
+                        className="w-full h-80 object-cover rounded-[2rem] mb-6 shadow-sm"
                         referrerPolicy="no-referrer"
                       />
                     )}
                     
-                    <div className="flex items-center gap-6 pt-2 border-t border-slate-50">
-                      <button className="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors">
-                        <CheckCircle className="w-5 h-5" />
-                        <span className="text-sm font-medium">إعجاب</span>
+                    <div className="flex items-center gap-6 pt-4 border-t border-slate-50">
+                      <button 
+                        onClick={() => handleLike(post.id)}
+                        className="flex items-center gap-2 text-slate-500 hover:text-red-500 transition-colors group"
+                      >
+                        <Heart className={`w-6 h-6 group-active:scale-125 transition-transform ${post.is_liked ? 'fill-red-500 text-red-500' : ''}`} />
+                        <span className="text-sm font-bold">{post.likes_count || 0}</span>
                       </button>
-                      <button className="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors">
-                        <MessageSquare className="w-5 h-5" />
-                        <span className="text-sm font-medium">تعليق</span>
+                      <button 
+                        onClick={() => handleOpenComments(post)}
+                        className="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors"
+                      >
+                        <MessageSquare className="w-6 h-6" />
+                        <span className="text-sm font-bold">{post.comments_count || 0}</span>
                       </button>
                     </div>
                   </div>
                 </div>
-              )) : (
-                <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
-                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500">لا توجد منشورات حالياً</p>
-                </div>
-              )}
+              ))}
             </motion.div>
           )}
 
@@ -669,42 +674,46 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="space-y-6"
             >
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900">الدروس المباشرة</h2>
-                <div className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
-                  <div className="w-2 h-2 bg-red-600 rounded-full"></div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">الدروس المباشرة</h2>
+                <div className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 animate-pulse">
+                  <div className="w-2.5 h-2.5 bg-red-600 rounded-full shadow-lg shadow-red-200"></div>
                   مباشر الآن
                 </div>
               </div>
 
-              {/* Live Session Card */}
-              <div className="bg-emerald-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-                <div className="relative z-10">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Users className="w-5 h-5" />
-                    <span className="text-sm font-medium">18 / 20 طالب</span>
+              {liveClasses.filter(l => l.status === 'live').map(live => (
+                <div key={live.id} className="bg-emerald-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-emerald-100 relative overflow-hidden group">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-6 bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-md">
+                      <Users className="w-5 h-5" />
+                      <span className="text-sm font-bold">{live.current_students} / {live.max_students} طالب</span>
+                    </div>
+                    <h3 className="text-3xl font-black mb-3 tracking-tight">{live.title}</h3>
+                    <p className="text-emerald-100 text-lg mb-8 font-medium">الأستاذ: {live.teacher?.first_name} {live.teacher?.last_name} • {live.subject}</p>
+                    <button 
+                      onClick={() => handleJoinLive(live)}
+                      className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-800/20 hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      انضم للجلسة
+                    </button>
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">مراجعة شاملة للفيزياء</h3>
-                  <p className="text-emerald-100 mb-6">الأستاذ: أحمد كمال • الوحدة الثانية</p>
-                  <button className="bg-white text-emerald-600 px-8 py-3 rounded-xl font-bold hover:bg-emerald-50 transition-colors">
-                    انضم الآن
-                  </button>
+                  <Video className="absolute -bottom-8 -right-8 w-48 h-48 text-white/10 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
                 </div>
-                <Video className="absolute -bottom-4 -right-4 w-32 h-32 text-white/10 rotate-12" />
-              </div>
+              ))}
 
-              <h3 className="text-lg font-bold text-slate-900 mt-8">الدروس القادمة</h3>
-              {[1, 2].map((i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100 flex items-center gap-4">
-                  <div className="w-16 h-16 bg-slate-100 rounded-xl flex flex-col items-center justify-center text-slate-500">
-                    <Clock className="w-6 h-6 mb-1" />
-                    <span className="text-[10px] font-bold">18:00</span>
+              <h3 className="text-xl font-black text-slate-900 mt-10 mb-4">الدروس القادمة</h3>
+              {liveClasses.filter(l => l.status === 'upcoming').map(live => (
+                <div key={live.id} className="bg-white rounded-[2rem] p-6 border border-slate-100 flex items-center gap-5 shadow-sm hover:shadow-md transition-all group">
+                  <div className="w-20 h-20 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                    <Clock className="w-7 h-7 mb-1" />
+                    <span className="text-xs font-black">{new Date(live.start_time).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-bold text-slate-900">درس اللغة الإنجليزية</h4>
-                    <p className="text-xs text-slate-500">اليوم • الأستاذة سارة</p>
+                    <h4 className="font-bold text-slate-900 text-lg mb-1">{live.title}</h4>
+                    <p className="text-sm text-slate-500 font-medium">{live.subject} • الأستاذ {live.teacher?.first_name}</p>
                   </div>
-                  <button className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl">
+                  <button className="p-3 text-emerald-600 bg-emerald-50 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all">
                     <ChevronRight className="w-6 h-6" />
                   </button>
                 </div>
@@ -715,31 +724,46 @@ export default function App() {
           {activeTab === 'messages' && (
             <motion.div 
               key="messages"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="space-y-4"
             >
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">الرسائل</h2>
-              {[1, 2, 3, 4].map((i) => (
-                <button key={i} className="w-full bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                  <div className="relative">
-                    <img 
-                      src={`https://api.dicebear.com/7.x/avataaars/svg?seed=user${i}`} 
-                      alt="User" 
-                      className="w-14 h-14 rounded-full bg-slate-100"
-                    />
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"></div>
+              <h2 className="text-3xl font-black text-slate-900 mb-8 tracking-tight">الرسائل الخاصة</h2>
+              
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-50">
+                {messages.length > 0 ? messages.map((msg) => {
+                  const otherUser = msg.sender_id === profile?.id ? null : msg.sender;
+                  if (!otherUser) return null;
+                  return (
+                    <button 
+                      key={msg.id} 
+                      onClick={() => handleOpenChat(otherUser)}
+                      className="w-full p-6 flex items-center gap-5 hover:bg-slate-50 transition-all text-right group"
+                    >
+                      <div className="relative">
+                        <img 
+                          src={otherUser.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.id}`} 
+                          className="w-16 h-16 rounded-[1.5rem] border-2 border-emerald-50 shadow-sm"
+                        />
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <h4 className="font-black text-slate-900 text-lg">{otherUser.first_name} {otherUser.last_name}</h4>
+                          <span className="text-xs text-slate-400 font-bold">{new Date(msg.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="text-slate-500 truncate font-medium">{msg.content}</p>
+                      </div>
+                    </button>
+                  );
+                }) : (
+                  <div className="p-20 text-center">
+                    <MessageSquare className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                    <p className="text-slate-400 font-bold">لا توجد رسائل حالياً</p>
                   </div>
-                  <div className="flex-1 text-right">
-                    <div className="flex justify-between items-center mb-1">
-                      <h4 className="font-bold text-slate-900">أحمد محمود</h4>
-                      <span className="text-[10px] text-slate-400">12:45 م</span>
-                    </div>
-                    <p className="text-sm text-slate-500 truncate">شكراً جزيلاً يا أستاذ على الشرح الرائع...</p>
-                  </div>
-                </button>
-              ))}
+                )}
+              </div>
             </motion.div>
           )}
 
@@ -749,130 +773,592 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
+              className="space-y-8"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900">الملفات والمواد</h2>
-                <button className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
-                  <Search className="w-5 h-5" />
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">المكتبة التعليمية</h2>
+                <button className="p-3 bg-white shadow-sm border border-slate-100 text-emerald-600 rounded-2xl hover:scale-110 transition-transform">
+                  <Search className="w-6 h-6" />
                 </button>
               </div>
 
+              {/* Subjects Grid */}
               <div className="grid grid-cols-2 gap-4">
                 {['الرياضيات', 'الفيزياء', 'العلوم', 'الأدب'].map((subject) => (
-                  <div key={subject} className="bg-white p-6 rounded-3xl border border-slate-100 text-center hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <FileText className="text-emerald-600 w-6 h-6" />
+                  <div key={subject} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 text-center hover:shadow-xl hover:shadow-emerald-100/20 transition-all cursor-pointer group">
+                    <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:bg-emerald-600 transition-all duration-500">
+                      <FileText className="text-emerald-600 w-8 h-8 group-hover:text-white transition-colors" />
                     </div>
-                    <h4 className="font-bold text-slate-900 mb-1">{subject}</h4>
-                    <p className="text-xs text-slate-500">24 ملف متاح</p>
+                    <h4 className="font-black text-slate-900 text-lg mb-1">{subject}</h4>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">24 ملف متاح</p>
                   </div>
                 ))}
               </div>
 
-              <h3 className="text-lg font-bold text-slate-900 mt-8">آخر الملفات المضافة</h3>
-              {[1, 2].map((i) => (
-                <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center text-red-500">
-                    <span className="font-bold text-xs">PDF</span>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-900 text-sm">ملخص الوحدة الأولى - {i}</h4>
-                    <p className="text-[10px] text-slate-500">2.4 MB • بصيغة PDF</p>
-                  </div>
-                  <button className="p-2 text-slate-400 hover:text-emerald-600">
-                    <Plus className="w-5 h-5" />
-                  </button>
+              {/* Videos Section */}
+              <div>
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
+                  <PlayCircle className="text-emerald-600 w-6 h-6" />
+                  فيديوهات توضيحية قصيرة
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {explainVideos.map(video => (
+                    <div key={video.id} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group">
+                      <div className="relative h-48 bg-slate-900">
+                        <img src={video.thumbnail_url || `https://picsum.photos/seed/${video.id}/400/300`} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-125 transition-transform duration-500">
+                            <PlayCircle className="text-white w-10 h-10" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-5">
+                        <h4 className="font-bold text-slate-900 mb-1">{video.title}</h4>
+                        <p className="text-xs text-slate-500 font-medium">{video.subject}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* Files List */}
+              <div>
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
+                  <Download className="text-emerald-600 w-6 h-6" />
+                  أحدث الملفات
+                </h3>
+                <div className="space-y-4">
+                  {lessonFiles.map(file => (
+                    <div key={file.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow">
+                      <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 font-black text-xs">
+                        PDF
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-slate-900 mb-1">{file.title}</h4>
+                        <p className="text-xs text-slate-400 font-bold">{file.subject} • 2.4 MB</p>
+                      </div>
+                      <button className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all">
+                        <Download className="w-6 h-6" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Upload & Organization Instructions */}
+              <div className="bg-emerald-50 rounded-[2.5rem] p-8 border border-emerald-100">
+                <h3 className="text-xl font-black text-emerald-900 mb-6 flex items-center gap-3">
+                  <Info className="w-6 h-6" />
+                  كيفية رفع وتنظيم الملفات
+                </h3>
+                <div className="space-y-6">
+                  <div className="flex gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="font-black text-emerald-600">1</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-emerald-900 mb-1">اختيار المادة المناسبة</h4>
+                      <p className="text-sm text-emerald-700/70 leading-relaxed">تأكد من اختيار القسم الصحيح للمادة الدراسية (رياضيات، فيزياء، إلخ) لسهولة وصول الطلاب إليها.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="font-black text-emerald-600">2</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-emerald-900 mb-1">تسمية الملف بوضوح</h4>
+                      <p className="text-sm text-emerald-700/70 leading-relaxed">استخدم أسماء واضحة مثل "ملخص الفصل الأول - الميكانيكا" بدلاً من أسماء عشوائية.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="font-black text-emerald-600">3</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-emerald-900 mb-1">صيغة الملفات</h4>
+                      <p className="text-sm text-emerald-700/70 leading-relaxed">نوصي باستخدام صيغة PDF للمستندات لضمان توافقها مع جميع الأجهزة.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
+
           {activeTab === 'profile' && (
             <motion.div 
               key="profile"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="space-y-8"
             >
-              <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-100">
-                <div className="relative inline-block mb-4">
+              <div className="bg-white rounded-[3rem] p-10 text-center shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-32 bg-emerald-600/5"></div>
+                <div className="relative inline-block mb-6">
                   <img 
-                    src={profile?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.auth_id}`} 
-                    alt="Profile" 
-                    className="w-32 h-32 rounded-full border-4 border-emerald-500 p-1"
+                    src={profile?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.id}`} 
+                    className="w-40 h-40 rounded-[2.5rem] border-8 border-white shadow-2xl relative z-10"
                   />
-                  <button className="absolute bottom-0 right-0 bg-emerald-600 text-white p-2 rounded-full shadow-lg">
-                    <Plus className="w-4 h-4" />
+                  <button className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-3 rounded-2xl shadow-xl z-20 hover:scale-110 transition-transform">
+                    <Plus className="w-5 h-5" />
                   </button>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900">{profile?.first_name} {profile?.last_name}</h2>
-                <p className="text-slate-500 mb-6">{profile?.role === 'student' ? 'طالب' : 'أستاذ'}</p>
+                <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
+                <div className="flex items-center justify-center gap-2 mb-8">
+                  <span className="bg-emerald-100 text-emerald-700 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
+                    {profile?.role === 'student' ? 'طالب متميز' : 'أستاذ معتمد'}
+                  </span>
+                </div>
                 
-                <div className="grid grid-cols-3 gap-4 border-t border-slate-50 pt-6">
+                <div className="grid grid-cols-3 gap-6 border-t border-slate-50 pt-8">
                   <div>
-                    <p className="text-xl font-bold text-slate-900">12</p>
-                    <p className="text-xs text-slate-500">مواد</p>
+                    <p className="text-2xl font-black text-slate-900">12</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase mt-1">دروس</p>
+                  </div>
+                  <div className="border-x border-slate-50">
+                    <p className="text-2xl font-black text-slate-900">450</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase mt-1">نقاط</p>
                   </div>
                   <div>
-                    <p className="text-xl font-bold text-slate-900">45</p>
-                    <p className="text-xs text-slate-500">ملفات</p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-slate-900">8</p>
-                    <p className="text-xs text-slate-500">مباشر</p>
+                    <p className="text-2xl font-black text-slate-900">8</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase mt-1">أوسمة</p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <button className="w-full bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between text-slate-700 hover:bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <BookOpen className="w-5 h-5 text-emerald-600" />
-                    <span className="font-medium">المواد المشترك بها</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
-                </button>
-                <button className="w-full bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between text-slate-700 hover:bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-emerald-600" />
-                    <span className="font-medium">ملفاتي المحملة</span>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
-                </button>
-                {profile?.role === 'admin' && (
-                  <button 
-                    onClick={() => setShowAdmin(true)}
-                    className="w-full bg-slate-900 p-4 rounded-2xl border border-slate-800 flex items-center justify-between text-white hover:bg-slate-800"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Users className="w-5 h-5 text-emerald-400" />
-                      <span className="font-medium">لوحة تحكم المدير</span>
+              <div className="space-y-4">
+                <button className="w-full bg-white p-6 rounded-[2rem] border border-slate-100 flex items-center justify-between group hover:bg-emerald-600 transition-all duration-500">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <Settings className="text-slate-400 group-hover:text-white w-6 h-6" />
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-500" />
-                  </button>
-                )}
+                    <span className="font-bold text-slate-700 group-hover:text-white text-lg">إعدادات الحساب</span>
+                  </div>
+                  <ChevronRight className="text-slate-300 group-hover:text-white w-6 h-6" />
+                </button>
+                
                 <button 
                   onClick={async () => {
-                    await signOut(auth);
+                    await supabase.auth.signOut();
                     setUser(null);
                     setProfile(null);
                   }}
-                  className="w-full bg-red-50 p-4 rounded-2xl border border-red-100 flex items-center justify-between text-red-600 hover:bg-red-100 mt-8"
+                  className="w-full bg-red-50 p-6 rounded-[2rem] border border-red-100 flex items-center justify-between group hover:bg-red-600 transition-all duration-500"
                 >
-                  <div className="flex items-center gap-3">
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-bold">تسجيل الخروج</span>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
+                      <LogOut className="text-red-600 w-6 h-6" />
+                    </div>
+                    <span className="font-bold text-red-600 group-hover:text-white text-lg">تسجيل الخروج</span>
                   </div>
                 </button>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'admin' && isAdmin && (
+            <motion.div 
+              key="admin"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-black text-slate-900 tracking-tight">لوحة الإدارة</h2>
+                <div className="flex gap-2">
+                  <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    <BarChart3 className="text-emerald-600 w-6 h-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                  <p className="text-slate-400 text-xs font-black uppercase mb-2">إجمالي الطلاب</p>
+                  <h3 className="text-3xl font-black text-slate-900">{allUsers.filter(u => u.role === 'student').length}</h3>
+                </div>
+                <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                  <p className="text-slate-400 text-xs font-black uppercase mb-2">إجمالي الأساتذة</p>
+                  <h3 className="text-3xl font-black text-slate-900">{allUsers.filter(u => u.role === 'teacher').length}</h3>
+                </div>
+              </div>
+
+              {/* Approvals Section */}
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+                  <h3 className="font-black text-slate-900 text-lg flex items-center gap-2">
+                    <UserCheck className="text-emerald-600 w-6 h-6" />
+                    طلبات انضمام الأساتذة
+                  </h3>
+                  <span className="bg-amber-100 text-amber-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    {allUsers.filter(u => u.role === 'teacher' && u.account_status === 'pending').length} طلب معلق
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {allUsers.filter(u => u.role === 'teacher' && u.account_status === 'pending').map((u) => (
+                    <div key={u.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <img src={u.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} className="w-14 h-14 rounded-2xl bg-slate-100 border-2 border-emerald-50" />
+                        <div>
+                          <h4 className="font-bold text-slate-900">{u.first_name} {u.last_name}</h4>
+                          <p className="text-xs text-slate-500 font-medium">مادة العلوم الطبيعية</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">قبول</button>
+                        <button className="bg-red-50 text-red-600 px-5 py-2.5 rounded-xl text-xs font-black hover:bg-red-100 transition-all">رفض</button>
+                      </div>
+                    </div>
+                  ))}
+                  {allUsers.filter(u => u.role === 'teacher' && u.account_status === 'pending').length === 0 && (
+                    <div className="p-10 text-center text-slate-400 font-bold">لا توجد طلبات معلقة</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Activity Logs */}
+              <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
+                  <Clock className="text-emerald-600 w-6 h-6" />
+                  سجل النشاطات الأخير
+                </h3>
+                <div className="space-y-6">
+                  {activityLogs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-4 group">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-2.5 shadow-lg shadow-emerald-200 group-hover:scale-150 transition-transform"></div>
+                      <div className="flex-1">
+                        <p className="text-slate-800 font-bold text-sm">
+                          <span className="text-emerald-600">{log.user_name}</span> {log.action}
+                        </p>
+                        <p className="text-xs text-slate-400 font-medium mt-1">{log.details}</p>
+                        <p className="text-[10px] text-slate-300 font-black uppercase mt-1.5 tracking-tighter">
+                          {new Date(log.timestamp).toLocaleTimeString('ar-EG')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
-      )}
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex items-center justify-between z-40 shadow-2xl shadow-slate-900/10">
+        {[
+          { id: 'home', icon: Home, label: 'الرئيسية' },
+          { id: 'live', icon: Video, label: 'مباشر' },
+          { id: 'messages', icon: MessageSquare, label: 'رسائل' },
+          { id: 'files', icon: FileText, label: 'مكتبة' },
+          { id: 'profile', icon: User, label: 'حسابي' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex flex-col items-center gap-1.5 transition-all duration-300 relative ${activeTab === tab.id ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            <tab.icon className={`w-7 h-7 ${activeTab === tab.id ? 'fill-emerald-600/10' : ''}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
+            {activeTab === tab.id && (
+              <motion.div 
+                layoutId="activeTab"
+                className="absolute -top-4 w-12 h-1.5 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200"
+              />
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* Live Class Modal */}
+      <AnimatePresence>
+        {isLiveModalOpen && selectedLive && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900 flex flex-col"
+          >
+            {/* Header */}
+            <div className="p-6 flex items-center justify-between bg-slate-900/50 backdrop-blur-md border-b border-white/10">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={handleLeaveLive}
+                  className="p-2 text-white hover:bg-white/10 rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <div>
+                  <h3 className="text-white font-black text-lg">{selectedLive.title}</h3>
+                  <p className="text-slate-400 text-xs font-bold">الأستاذ {selectedLive.teacher?.first_name}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="bg-red-500 text-white px-3 py-1 rounded-lg text-[10px] font-black animate-pulse">LIVE</div>
+                <div className="text-white/60 text-xs font-bold flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  {selectedLive.current_students}
+                </div>
+              </div>
+            </div>
+
+            {/* Video Area (Simulated) */}
+            <div className="flex-1 relative flex items-center justify-center bg-slate-950 overflow-hidden">
+              <div className="absolute inset-0 opacity-20">
+                <img src="https://picsum.photos/seed/live-bg/1200/800" className="w-full h-full object-cover blur-3xl" />
+              </div>
+              
+              {/* Teacher View */}
+              <div className="relative z-10 w-full max-w-4xl aspect-video bg-slate-800 rounded-[3rem] shadow-2xl border-4 border-white/5 flex items-center justify-center overflow-hidden group">
+                <img src={selectedLive.teacher?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedLive.teacher_id}`} className="w-48 h-48 rounded-full border-8 border-emerald-500/20" />
+                <div className="absolute bottom-8 left-8 bg-black/40 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
+                  <p className="text-white font-black text-lg">الأستاذ {selectedLive.teacher?.first_name} {selectedLive.teacher?.last_name}</p>
+                </div>
+                <div className="absolute top-8 right-8 flex gap-2">
+                  <div className="bg-emerald-500 p-3 rounded-2xl shadow-lg">
+                    <Mic className="text-white w-6 h-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating Hand Notification */}
+              <AnimatePresence>
+                {isHandRaised && (
+                  <motion.div 
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -50, opacity: 0 }}
+                    className="absolute top-24 left-1/2 -translate-x-1/2 bg-amber-500 text-white px-8 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 z-30 border-4 border-white/20"
+                  >
+                    <Hand className="w-8 h-8 animate-bounce" />
+                    <span className="text-xl font-black">لقد رفعت يدك!</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Controls */}
+            <div className="p-8 bg-slate-900 border-t border-white/10 flex items-center justify-center gap-6">
+              <button 
+                onClick={() => setIsHandRaised(!isHandRaised)}
+                className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-all duration-500 shadow-2xl ${isHandRaised ? 'bg-amber-500 text-white scale-110 rotate-12' : 'bg-white/5 text-white hover:bg-white/10'}`}
+              >
+                <Hand className="w-10 h-10" />
+              </button>
+              
+              <button 
+                disabled={!isMicApproved}
+                onClick={() => setIsMicOn(!isMicOn)}
+                className={`w-24 h-24 rounded-[2.5rem] flex items-center justify-center transition-all duration-500 shadow-2xl ${!isMicApproved ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : isMicOn ? 'bg-emerald-500 text-white scale-110' : 'bg-white/5 text-white hover:bg-white/10'}`}
+              >
+                {isMicOn ? <Mic className="w-12 h-12" /> : <MicOff className="w-12 h-12" />}
+              </button>
+
+              <button 
+                onClick={handleLeaveLive}
+                className="w-20 h-20 bg-red-500 text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-red-500/20 hover:bg-red-600 hover:scale-110 transition-all"
+              >
+                <LogOut className="w-10 h-10" />
+              </button>
+            </div>
+
+            {/* Mic Approval Simulation for Demo */}
+            {isHandRaised && !isMicApproved && (
+              <div className="absolute bottom-36 left-1/2 -translate-x-1/2">
+                <button 
+                  onClick={() => setIsMicApproved(true)}
+                  className="bg-white/10 backdrop-blur-md text-white/40 text-[10px] px-4 py-2 rounded-full hover:text-white transition-colors"
+                >
+                  (محاكاة: الأستاذ يوافق على المايك)
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Post Modal */}
+      <AnimatePresence>
+        {isPostModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-2xl font-black text-slate-900">إنشاء منشور جديد</h3>
+                <button onClick={() => setIsPostModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <textarea 
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  placeholder="اكتب محتوى المنشور هنا..."
+                  className="w-full h-40 bg-slate-50 rounded-2xl p-6 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                />
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest px-2">رابط الصورة (اختياري)</label>
+                  <input 
+                    type="text"
+                    value={newPostImage}
+                    onChange={(e) => setNewPostImage(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+                <button 
+                  onClick={handleCreatePost}
+                  className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                >
+                  نشر الآن
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Comments Modal */}
+      <AnimatePresence>
+        {isCommentModalOpen && selectedPostForComment && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4"
+          >
+            <motion.div 
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              className="bg-white w-full max-w-lg h-[80vh] sm:h-auto sm:max-h-[80vh] rounded-t-[3rem] sm:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden"
+            >
+              <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-2xl font-black text-slate-900">التعليقات</h3>
+                <button onClick={() => setIsCommentModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                  <X className="w-6 h-6 text-slate-400" />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar">
+                {postComments.length > 0 ? postComments.map((comment) => (
+                  <div key={comment.id} className="flex gap-4">
+                    <img 
+                      src={comment.author?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} 
+                      className="w-10 h-10 rounded-xl border border-slate-100"
+                    />
+                    <div className="flex-1 bg-slate-50 rounded-2xl p-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <h5 className="font-bold text-slate-900 text-sm">{comment.author?.first_name} {comment.author?.last_name}</h5>
+                        <span className="text-[10px] text-slate-400 font-bold">{new Date(comment.created_at).toLocaleDateString('ar-EG')}</span>
+                      </div>
+                      <p className="text-slate-600 text-sm leading-relaxed">{comment.content}</p>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="text-center py-10">
+                    <p className="text-slate-400 font-bold">لا توجد تعليقات بعد. كن أول من يعلق!</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+                <input 
+                  type="text"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="اكتب تعليقك هنا..."
+                  className="flex-1 bg-white rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                />
+                <button 
+                  onClick={handleAddComment}
+                  className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                >
+                  <Send className="w-6 h-6" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Chat Modal */}
+      <AnimatePresence>
+        {isChatModalOpen && selectedUserForChat && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900 flex flex-col"
+          >
+            {/* Header */}
+            <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setIsChatModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                  <ChevronRight className="w-6 h-6 text-slate-400" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <img src={selectedUserForChat.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUserForChat.id}`} className="w-10 h-10 rounded-xl" />
+                  <div>
+                    <h3 className="font-black text-slate-900">{selectedUserForChat.first_name} {selectedUserForChat.last_name}</h3>
+                    <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">نشط الآن</p>
+                  </div>
+                </div>
+              </div>
+              <button className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                <MoreVertical className="w-6 h-6 text-slate-400" />
+              </button>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 bg-slate-50 overflow-y-auto p-6 space-y-4 no-scrollbar">
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className={`flex ${msg.sender_id === profile?.id ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${msg.sender_id === profile?.id ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}>
+                    <p className="font-medium leading-relaxed">{msg.content}</p>
+                    <p className={`text-[9px] mt-1 font-bold uppercase ${msg.sender_id === profile?.id ? 'text-emerald-100' : 'text-slate-300'}`}>
+                      {new Date(msg.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Input Area */}
+            <div className="p-6 bg-white border-t border-slate-100 flex gap-3">
+              <button className="p-4 text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">
+                <Plus className="w-6 h-6" />
+              </button>
+              <input 
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="اكتب رسالتك هنا..."
+                className="flex-1 bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              />
+              <button 
+                onClick={handleSendMessage}
+                className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+              >
+                <Send className="w-6 h-6" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
