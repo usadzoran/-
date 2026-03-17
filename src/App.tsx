@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Component } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, 
@@ -98,6 +98,51 @@ interface FirestoreErrorInfo {
       email: string | null;
       photoUrl: string | null;
     }[];
+  }
+}
+
+class ErrorBoundary extends (Component as any) {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let errorMessage = "حدث خطأ غير متوقع. يرجى إعادة تحميل الصفحة.";
+      try {
+        const parsed = JSON.parse(this.state.error.message);
+        if (parsed.error) errorMessage = `خطأ في قاعدة البيانات: ${parsed.error}`;
+      } catch (e) {
+        errorMessage = this.state.error.message || errorMessage;
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 text-center" dir="rtl">
+          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mb-6">
+            <AlertCircle className="w-10 h-10" />
+          </div>
+          <h2 className="text-3xl font-black text-slate-900 mb-4">عذراً، حدث خطأ ما</h2>
+          <p className="text-slate-600 mb-8 max-w-md font-medium">{errorMessage}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
+          >
+            إعادة تحميل الصفحة
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
   }
 }
 
@@ -429,6 +474,14 @@ const AuthScreen = ({ onAuthSuccess }: { onAuthSuccess: (user: any) => void }) =
 // --- Main App ---
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -737,7 +790,8 @@ export default function App() {
 
   const handleJoinLive = async (live: LiveClass) => {
     if (live.current_students >= 20) {
-      alert("عذراً، الجلسة مكتملة (الحد الأقصى 20 طالب)");
+      setFirebaseError("عذراً، الجلسة مكتملة (الحد الأقصى 20 طالب)");
+      setTimeout(() => setFirebaseError(null), 5000);
       return;
     }
     setSelectedLive(live);
