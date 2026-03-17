@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
   Video, 
@@ -39,8 +39,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   onAuthStateChanged, 
-  signOut,
-  User as FirebaseUser
+  signOut
 } from 'firebase/auth';
 import { 
   doc, 
@@ -112,17 +111,20 @@ class ErrorBoundary extends (Component as any) {
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       let errorMessage = "حدث خطأ غير متوقع. يرجى إعادة تحميل الصفحة.";
       try {
-        const parsed = JSON.parse(this.state.error.message);
-        if (parsed.error) errorMessage = `خطأ في قاعدة البيانات: ${parsed.error}`;
+        if (this.state.error && this.state.error.message) {
+          const parsed = JSON.parse(this.state.error.message);
+          if (parsed.error) errorMessage = `خطأ في قاعدة البيانات: ${parsed.error}`;
+          else errorMessage = this.state.error.message;
+        }
       } catch (e) {
-        errorMessage = this.state.error.message || errorMessage;
+        errorMessage = this.state.error?.message || errorMessage;
       }
 
       return (
@@ -131,7 +133,7 @@ class ErrorBoundary extends (Component as any) {
             <AlertCircle className="w-10 h-10" />
           </div>
           <h2 className="text-3xl font-black text-slate-900 mb-4">عذراً، حدث خطأ ما</h2>
-          <p className="text-slate-600 mb-8 max-w-md font-medium">{errorMessage}</p>
+          <p className="text-slate-600 mb-8 max-w-md font-medium leading-relaxed">{errorMessage}</p>
           <button 
             onClick={() => window.location.reload()}
             className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
@@ -145,46 +147,6 @@ class ErrorBoundary extends (Component as any) {
     return this.props.children;
   }
 }
-
-const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-};
-
-// --- Helper for Activity Logging ---
-const logActivity = async (action: string, details: string = '') => {
-  const user = auth.currentUser;
-  if (!user) return;
-  try {
-    await addDoc(collection(db, 'activity_logs'), {
-      user_id: user.uid,
-      user_name: user.email,
-      action,
-      details,
-      timestamp: new Date().toISOString()
-    });
-  } catch (e) {
-    console.error("Error logging activity:", e);
-  }
-};
 
 // --- Components ---
 
@@ -487,6 +449,47 @@ function AppContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+
+  const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+    const errInfo: FirestoreErrorInfo = {
+      error: error instanceof Error ? error.message : String(error),
+      authInfo: {
+        userId: auth.currentUser?.uid,
+        email: auth.currentUser?.email,
+        emailVerified: auth.currentUser?.emailVerified,
+        isAnonymous: auth.currentUser?.isAnonymous,
+        tenantId: auth.currentUser?.tenantId,
+        providerInfo: auth.currentUser?.providerData.map(provider => ({
+          providerId: provider.providerId,
+          displayName: provider.displayName,
+          email: provider.email,
+          photoUrl: provider.photoURL
+        })) || []
+      },
+      operationType,
+      path
+    };
+    const errorMsg = JSON.stringify(errInfo);
+    console.error('Firestore Error: ', errorMsg);
+    setFirebaseError(`خطأ في قاعدة البيانات (${operationType}): ${errInfo.error}`);
+    throw new Error(errorMsg);
+  };
+
+  const logActivity = async (action: string, details: string = '') => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      await addDoc(collection(db, 'activity_logs'), {
+        user_id: user.uid,
+        action,
+        details,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Activity log error:', err);
+    }
+  };
   
   // Data States
   const [posts, setPosts] = useState<Post[]>([]);
@@ -522,7 +525,6 @@ function AppContent() {
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [isMicApproved, setIsMicApproved] = useState(false);
-  const [firebaseError, setFirebaseError] = useState<string | null>(null);
 
   useEffect(() => {
     // Verify Firebase Connection
@@ -539,6 +541,7 @@ function AppContent() {
     checkConnection();
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser ? 'User logged in' : 'No user');
       if (firebaseUser) {
         setUser(firebaseUser);
         await fetchProfile(firebaseUser.uid);
@@ -553,20 +556,26 @@ function AppContent() {
   }, []);
 
   const fetchProfile = async (authId: string) => {
+    console.log('Fetching profile for:', authId);
     try {
       const docRef = doc(db, 'users', authId);
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
         const data = docSnap.data() as UserProfile;
+        console.log('Profile found:', data.role);
         setProfile(data);
         setupRealtime(data);
         fetchAllData(data);
+      } else {
+        console.warn('No profile document found for user:', authId);
       }
     } catch (error) {
+      console.error('Error in fetchProfile:', error);
       handleFirestoreError(error, OperationType.GET, `users/${authId}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const setupRealtime = (userProfile: UserProfile) => {
