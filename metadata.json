@@ -1,8 +1,5 @@
 {
-  "name": "علّمني",
-  "description": "منصة تعليمية متكاملة للطلاب والأساتذة تتيح الدروس المباشرة، تبادل الملفات، والتواصل الفعال باستخدام Supabase.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
+  "name": "Atlas Escape",
+  "description": "A premium global travel magazine and platform for discovering the world's finest destinations.",
+  "requestFramePermissions": []
 }

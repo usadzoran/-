@@ -1,1741 +1,624 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Home, 
-  Video, 
-  MessageSquare, 
-  FileText, 
-  User, 
-  LogOut, 
+  Menu, 
+  X, 
+  ChevronRight, 
   Plus, 
-  Bell,
-  Search,
-  Menu,
-  X,
-  ChevronRight,
-  BookOpen,
-  Users,
-  CheckCircle,
-  Clock,
-  Heart,
-  Send,
-  MoreVertical,
-  Hand,
-  Mic,
-  MicOff,
-  ShieldCheck,
-  Star,
-  Download,
-  PlayCircle,
+  Image as ImageIcon, 
+  MapPin, 
+  Clock, 
+  Search, 
   ArrowRight,
   Settings,
-  BarChart3,
-  UserCheck,
-  AlertCircle,
-  Info,
-  Layout,
-  LogIn,
-  UserPlus
+  Globe,
+  Compass,
+  Navigation,
+  Heart
 } from 'lucide-react';
-import { auth, db } from './firebase';
-import { 
-  onAuthStateChanged, 
-  signOut,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
-} from 'firebase/auth';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  addDoc, 
-  serverTimestamp,
-  where,
-  updateDoc,
-  getDocs,
-  getDocFromServer,
-  limit
-} from 'firebase/firestore';
 
 // --- Types ---
-type Role = 'student' | 'teacher' | 'admin';
-type AccountStatus = 'pending' | 'approved' | 'rejected';
-
-interface UserProfile {
+interface Article {
   id: string;
-  auth_id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  role: Role;
-  account_status: AccountStatus;
-  profile_image?: string;
-  created_at: any;
-}
-
-interface Post {
-  id: string;
-  author_id: string;
-  author_name: string;
-  author_image?: string;
+  title: string;
   content: string;
-  image_url?: string;
-  likes_count: number;
-  comments_count: number;
-  created_at: any;
-  is_liked?: boolean;
+  category: string;
+  images: string[];
+  date: string;
+  preview: string;
 }
 
-interface LiveClass {
-  id: string;
-  title: string;
-  teacher_id: string;
-  subject: string;
-  start_time: any;
-  status: 'upcoming' | 'live' | 'ended';
-  max_students: number;
-  current_students: number;
-  teacher?: UserProfile;
-}
+const CATEGORIES = [
+  "Home",
+  "Arab Countries",
+  "European Countries",
+  "American Countries",
+  "Asian Countries"
+];
 
-interface LessonFile {
-  id: string;
-  title: string;
-  subject: string;
-  file_url: string;
-  uploaded_by: string;
-  created_at: any;
-}
+const TRENDING_COUNTRIES = [
+  { name: "USA", image: "https://images.unsplash.com/photo-1485738422979-f5c462d49f74?auto=format&fit=crop&q=80&w=800" },
+  { name: "France", image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800" },
+  { name: "Thailand", image: "https://images.unsplash.com/photo-1528181304800-2f140819ad9c?auto=format&fit=crop&q=80&w=800" },
+  { name: "Japan", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800" },
+  { name: "Morocco", image: "https://images.unsplash.com/photo-1489749798305-4fea3ae63d43?auto=format&fit=crop&q=80&w=800" }
+];
 
-interface ExplainVideo {
-  id: string;
-  title: string;
-  subject: string;
-  video_url: string;
-  thumbnail_url?: string;
-  created_at: any;
-}
-
-interface Message {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  sender_name: string;
-  sender_image?: string;
-  content: string;
-  created_at: any;
-}
-
-// --- Components ---
-
-const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
-  const [hasError, setHasError] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  useEffect(() => {
-    const handleError = (error: ErrorEvent) => {
-      console.error("Caught error:", error);
-      setHasError(true);
-      setErrorMsg(error.message);
-    };
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
-  }, []);
-
-  if (hasError) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 max-w-md w-full">
-          <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-red-500" />
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">عذراً، حدث خطأ ما</h2>
-          <p className="text-slate-500 font-medium mb-8 leading-relaxed">
-            حدث خطأ غير متوقع في التطبيق. يرجى المحاولة مرة أخرى أو الاتصال بالدعم.
-          </p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
-          >
-            إعادة تحميل الصفحة
-          </button>
-          {errorMsg && <p className="mt-4 text-[10px] text-slate-300 font-mono">{errorMsg}</p>}
-        </div>
-      </div>
-    );
+const INITIAL_ARTICLES: Article[] = [
+  {
+    id: '1',
+    title: "The Golden Sands of Dubai",
+    content: "Dubai is a city of superlatives, where the desert meets the sea and the future meets the past. From the Burj Khalifa to the traditional souks, it's a destination like no other.",
+    category: "Arab Countries",
+    images: ["https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800"],
+    date: "2024-03-15",
+    preview: "Discover the luxury and tradition of the Middle East's most vibrant city."
+  },
+  {
+    id: '2',
+    title: "A Parisian Romance",
+    content: "Paris is always a good idea. The Eiffel Tower, the Louvre, and the charming cafes of Montmartre await those who seek beauty and inspiration.",
+    category: "European Countries",
+    images: ["https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800"],
+    date: "2024-03-14",
+    preview: "Walk through the streets of the world's most romantic city."
+  },
+  {
+    id: '3',
+    title: "Tokyo: Neon and Tradition",
+    content: "Tokyo is a city that never sleeps, yet finds peace in its ancient temples. Experience the thrill of Shibuya Crossing and the serenity of Meiji Shrine.",
+    category: "Asian Countries",
+    images: ["https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=800"],
+    date: "2024-03-13",
+    preview: "Explore the fascinating contrast between high-tech and history."
   }
-
-  return <>{children}</>;
-};
+];
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('home');
-  const [adminTab, setAdminTab] = useState('dashboard');
-  const [isAuthReady, setIsAuthReady] = useState(false);
-  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [activeCategory, setActiveCategory] = useState("Home");
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
-  const logActivity = async (action: string, details: string, userProfile?: UserProfile | null) => {
-    const currentProfile = userProfile || profile;
-    if (!currentProfile) return;
-    try {
-      await addDoc(collection(db, 'activity_logs'), {
-        user_id: currentProfile.auth_id,
-        user_name: `${currentProfile.first_name} ${currentProfile.last_name}`,
-        action,
-        details,
-        timestamp: serverTimestamp()
-      });
-    } catch (error) {
-      console.error("Error logging activity:", error);
-    }
-  };
+  // Admin Form State
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
+  const [newCategory, setNewCategory] = useState(CATEGORIES[1]);
+  const [newImages, setNewImages] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auth & Profile
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      console.log("Auth state changed:", authUser?.email);
-      setUser(authUser);
-      if (authUser) {
-        try {
-          const profileDoc = await getDoc(doc(db, 'users', authUser.uid));
-          if (profileDoc.exists()) {
-            const p = { id: profileDoc.id, ...profileDoc.data() } as UserProfile;
-            setProfile(p);
-            logActivity('سجل دخول', 'من المتصفح', p);
-          } else {
-            console.warn("No profile found for user:", authUser.uid);
-          }
-        } catch (err) {
-          console.error("Error fetching profile:", err);
-        }
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-      setIsAuthReady(true);
-    });
+    const saved = localStorage.getItem('atlas_escape_articles');
+    if (saved) {
+      setArticles(JSON.parse(saved));
+    } else {
+      setArticles(INITIAL_ARTICLES);
+      localStorage.setItem('atlas_escape_articles', JSON.stringify(INITIAL_ARTICLES));
+    }
 
-    // Test connection
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if(error instanceof Error && error.message.includes('the client is offline')) {
-          setFirebaseError("يرجى التحقق من إعدادات Firebase. العميل غير متصل.");
-        }
-      }
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
     };
-    testConnection();
-
-    return () => unsubscribe();
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-24 h-24 border-8 border-emerald-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-6"></div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">جاري التحميل...</h1>
-        </div>
-      </div>
-    );
-  }
+  const saveArticles = (newArticles: Article[]) => {
+    setArticles(newArticles);
+    localStorage.setItem('atlas_escape_articles', JSON.stringify(newArticles));
+  };
 
-  if (firebaseError) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100 max-w-md w-full">
-          <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-amber-500" />
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">خطأ في الاتصال</h2>
-          <p className="text-slate-500 font-medium mb-8 leading-relaxed">{firebaseError}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <PublicArea />;
-  }
-
-  return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-slate-50 font-sans text-right" dir="rtl">
-        {profile?.role === 'admin' ? (
-          <AdminArea profile={profile} adminTab={adminTab} setAdminTab={setAdminTab} logActivity={logActivity} />
-        ) : (
-          <MainApp profile={profile} activeTab={activeTab} setActiveTab={setActiveTab} logActivity={logActivity} />
-        )}
-      </div>
-    </ErrorBoundary>
-  );
-}
-
-// --- Public Area ---
-
-function PublicArea() {
-  const [view, setView] = useState<'splash' | 'login' | 'signup_student' | 'signup_teacher'>('splash');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async (e: React.FormEvent) => {
+  const handlePublish = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    if (!newTitle || !newContent) return;
+
+    const article: Article = {
+      id: Date.now().toString(),
+      title: newTitle,
+      content: newContent,
+      category: newCategory,
+      images: newImages.length > 0 ? newImages : ["https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800"],
+      date: new Date().toISOString().split('T')[0],
+      preview: newContent.substring(0, 100) + "..."
+    };
+
+    saveArticles([article, ...articles]);
+    setNewTitle('');
+    setNewContent('');
+    setNewImages([]);
+    setIsAdminOpen(false);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const readers = Array.from(files).map((file: File) => {
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(readers).then(results => {
+        setNewImages(prev => [...prev, ...results]);
+      });
     }
   };
 
-  const handleSignup = async (e: React.FormEvent, role: Role) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+  const filteredArticles = activeCategory === "Home" 
+    ? articles 
+    : articles.filter(a => a.category === activeCategory);
+
+  const latestArticles = articles.slice(0, 3);
+
+  return (
+    <div className="min-h-screen bg-[#F5F2ED] text-[#1A1A1A] font-sans selection:bg-[#C5A059] selection:text-white">
       
-      await setDoc(doc(db, 'users', user.uid), {
-        auth_id: user.uid,
-        first_name: firstName,
-        last_name: lastName,
-        email: email,
-        role: role,
-        account_status: role === 'teacher' ? 'pending' : 'approved',
-        created_at: serverTimestamp()
-      });
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (view === 'splash') {
-    return (
-      <div className="min-h-screen bg-emerald-600 flex flex-col items-center justify-center p-6 text-white text-center">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="mb-12"
-        >
-          <div className="w-32 h-32 bg-white rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-2xl">
-            <BookOpen className="w-16 h-16 text-emerald-600" />
+      {/* --- Navigation --- */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+        scrolled ? 'bg-white/90 backdrop-blur-md py-4 shadow-sm' : 'bg-transparent py-6'
+      }`}>
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe className={`w-8 h-8 ${scrolled ? 'text-[#C5A059]' : 'text-white'}`} />
+            <h1 className={`text-2xl font-black tracking-tighter uppercase ${scrolled ? 'text-[#1A1A1A]' : 'text-white'}`}>
+              Atlas <span className={scrolled ? 'text-[#C5A059]' : 'text-[#C5A059]'}>Escape</span>
+            </h1>
           </div>
-          <h1 className="text-5xl font-black tracking-tighter mb-4">علّمني</h1>
-          <p className="text-emerald-100 text-xl font-medium max-w-xs mx-auto">المنصة التعليمية الأولى في الجزائر</p>
-        </motion.div>
 
-        <div className="space-y-4 w-full max-w-xs">
-          <button 
-            onClick={() => setView('login')}
-            className="w-full bg-white text-emerald-600 py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-3"
-          >
-            <LogIn className="w-6 h-6" />
-            تسجيل الدخول
-          </button>
-          <button 
-            onClick={() => setView('signup_student')}
-            className="w-full bg-emerald-700 text-white py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-emerald-800 transition-all flex items-center justify-center gap-3"
-          >
-            <UserPlus className="w-6 h-6" />
-            حساب طالب جديد
-          </button>
-          <button 
-            onClick={() => setView('signup_teacher')}
-            className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl hover:bg-emerald-400 transition-all flex items-center justify-center gap-3"
-          >
-            <Users className="w-6 h-6" />
-            حساب أستاذ جديد
-          </button>
+          {/* Desktop Menu */}
+          <div className="hidden md:flex items-center gap-8">
+            {CATEGORIES.map(cat => (
+              <button 
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`text-sm font-bold uppercase tracking-widest transition-all hover:text-[#C5A059] ${
+                  activeCategory === cat 
+                    ? 'text-[#C5A059]' 
+                    : scrolled ? 'text-[#1A1A1A]' : 'text-white'
+                }`}
+              >
+                {cat === "Home" ? "Home" : cat.split(' ')[0]}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsAdminOpen(true)}
+              className={`p-2 rounded-full transition-all ${scrolled ? 'bg-slate-100 text-slate-600' : 'bg-white/10 text-white hover:bg-white/20'}`}
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`md:hidden p-2 rounded-full transition-all ${scrolled ? 'bg-slate-100 text-slate-600' : 'bg-white/10 text-white'}`}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile Menu Overlay */}
+      <div className={`fixed inset-0 z-40 bg-white transition-all duration-500 md:hidden ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}`}>
+        <div className="flex flex-col items-center justify-center h-full gap-8">
+          {CATEGORIES.map(cat => (
+            <button 
+              key={cat}
+              onClick={() => { setActiveCategory(cat); setIsMenuOpen(false); }}
+              className="text-2xl font-black uppercase tracking-tighter text-[#1A1A1A] hover:text-[#C5A059]"
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6" dir="rtl">
-      <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-slate-100 max-w-md w-full">
-        <button onClick={() => setView('splash')} className="mb-8 p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-emerald-600 transition-colors">
-          <ArrowRight className="w-6 h-6" />
-        </button>
-
-        <h2 className="text-3xl font-black text-slate-900 mb-2">
-          {view === 'login' ? 'مرحباً بك مجدداً' : view === 'signup_student' ? 'إنشاء حساب طالب' : 'إنشاء حساب أستاذ'}
-        </h2>
-        <p className="text-slate-500 mb-8 font-medium">يرجى إدخال بياناتك للمتابعة</p>
-
-        <form onSubmit={(e) => view === 'login' ? handleLogin(e) : handleSignup(e, view === 'signup_student' ? 'student' : 'teacher')} className="space-y-4">
-          {(view === 'signup_student' || view === 'signup_teacher') && (
-            <div className="grid grid-cols-2 gap-4">
-              <input 
-                type="text" 
-                placeholder="الاسم" 
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-              <input 
-                type="text" 
-                placeholder="اللقب" 
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          )}
-          <input 
-            type="email" 
-            placeholder="البريد الإلكتروني" 
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+      {/* --- Hero Section --- */}
+      <header className="relative h-screen flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&q=80&w=2000" 
+            className="w-full h-full object-cover scale-105 animate-slow-zoom"
+            alt="Hero Background"
           />
-          <input 
-            type="password" 
-            placeholder="كلمة المرور" 
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-          />
-          
-          {error && <p className="text-red-500 text-sm font-bold bg-red-50 p-4 rounded-2xl">{error}</p>}
-
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all disabled:opacity-50"
-          >
-            {loading ? 'جاري المعالجة...' : view === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
-          </button>
-        </form>
-
-        <p className="mt-8 text-center text-slate-500 font-medium">
-          {view === 'login' ? (
-            <>ليس لديك حساب؟ <button onClick={() => setView('signup_student')} className="text-emerald-600 font-black">سجل الآن</button></>
-          ) : (
-            <>لديك حساب بالفعل؟ <button onClick={() => setView('login')} className="text-emerald-600 font-black">سجل دخولك</button></>
-          )}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// --- Main App (Student & Teacher) ---
-
-function MainApp({ profile, activeTab, setActiveTab, logActivity }: { profile: UserProfile | null, activeTab: string, setActiveTab: (t: string) => void, logActivity: (a: string, d: string) => void }) {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
-  const [lessonFiles, setLessonFiles] = useState<LessonFile[]>([]);
-  const [explainVideos, setExplainVideos] = useState<ExplainVideo[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
-  const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [selectedLive, setSelectedLive] = useState<LiveClass | null>(null);
-  const [selectedUserForChat, setSelectedUserForChat] = useState<UserProfile | null>(null);
-  const [postContent, setPostContent] = useState('');
-  const [liveTitle, setLiveTitle] = useState('');
-  const [liveSubject, setLiveSubject] = useState('');
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [isHandRaised, setIsHandRaised] = useState(false);
-  const [isMicOn, setIsMicOn] = useState(false);
-  const [isMicApproved, setIsMicApproved] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const [selectedPostForComments, setSelectedPostForComments] = useState<Post | null>(null);
-  const [comments, setComments] = useState<any[]>([]);
-
-  useEffect(() => {
-    // Fetch Posts
-    const qPosts = query(collection(db, 'posts'), orderBy('created_at', 'desc'));
-    const unsubPosts = onSnapshot(qPosts, (snap) => {
-      setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Post)));
-    });
-
-    // Fetch Live Classes
-    const qLive = query(collection(db, 'live_classes'), where('status', 'in', ['upcoming', 'live']));
-    const unsubLive = onSnapshot(qLive, (snap) => {
-      setLiveClasses(snap.docs.map(d => ({ id: d.id, ...d.data() } as LiveClass)));
-    });
-
-    // Fetch Files
-    const qFiles = query(collection(db, 'lesson_files'), orderBy('created_at', 'desc'));
-    const unsubFiles = onSnapshot(qFiles, (snap) => {
-      setLessonFiles(snap.docs.map(d => ({ id: d.id, ...d.data() } as LessonFile)));
-    });
-
-    // Fetch Videos
-    const qVideos = query(collection(db, 'explain_videos'), orderBy('created_at', 'desc'));
-    const unsubVideos = onSnapshot(qVideos, (snap) => {
-      setExplainVideos(snap.docs.map(d => ({ id: d.id, ...d.data() } as ExplainVideo)));
-    });
-
-    // Fetch Messages
-    if (profile) {
-      const qMsgs = query(
-        collection(db, 'messages'), 
-        where('receiver_id', '==', profile.auth_id),
-        orderBy('created_at', 'desc')
-      );
-      const unsubMsgs = onSnapshot(qMsgs, (snap) => {
-        setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() } as Message)));
-      });
-      return () => { unsubPosts(); unsubLive(); unsubFiles(); unsubVideos(); unsubMsgs(); };
-    }
-
-    return () => { unsubPosts(); unsubLive(); unsubFiles(); unsubVideos(); };
-  }, [profile]);
-
-  const handleLike = async (postId: string) => {
-    if (!profile) return;
-    const postRef = doc(db, 'posts', postId);
-    const post = posts.find(p => p.id === postId);
-    if (post) {
-      await updateDoc(postRef, {
-        likes_count: (post.likes_count || 0) + 1
-      });
-      logActivity('أعجب بمنشور', `منشور: ${post.content.substring(0, 20)}...`);
-    }
-  };
-
-  const handleCreatePost = async () => {
-    if (!postContent.trim() || !profile) return;
-    await addDoc(collection(db, 'posts'), {
-      author_id: profile.auth_id,
-      author_name: `${profile.first_name} ${profile.last_name}`,
-      author_image: profile.profile_image || null,
-      content: postContent,
-      likes_count: 0,
-      comments_count: 0,
-      created_at: serverTimestamp()
-    });
-    logActivity('أنشأ منشوراً', postContent.substring(0, 30));
-    setPostContent('');
-    setIsPostModalOpen(false);
-  };
-
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadSubject, setUploadSubject] = useState('');
-  const [uploadType, setUploadType] = useState<'file' | 'video'>('file');
-
-  const handleUpload = async () => {
-    if (!uploadTitle || !uploadSubject || !profile) return;
-    
-    if (uploadType === 'file') {
-      await addDoc(collection(db, 'lesson_files'), {
-        title: uploadTitle,
-        subject: uploadSubject,
-        file_url: 'https://example.com/demo-file.pdf', // In a real app, this would be from Firebase Storage
-        uploaded_by: profile.auth_id,
-        created_at: serverTimestamp()
-      });
-      logActivity('رفع ملفاً تعليمياً', `${uploadTitle} (${uploadSubject})`);
-    } else {
-      await addDoc(collection(db, 'explain_videos'), {
-        title: uploadTitle,
-        subject: uploadSubject,
-        video_url: 'https://example.com/demo-video.mp4',
-        thumbnail_url: `https://picsum.photos/seed/${Math.random()}/400/300`,
-        created_at: serverTimestamp()
-      });
-      logActivity('رفع فيديو توضيحي', `${uploadTitle} (${uploadSubject})`);
-    }
-    
-    setUploadTitle('');
-    setUploadSubject('');
-    setIsUploadModalOpen(false);
-  };
-
-  const handleCreateLive = async () => {
-    if (!liveTitle.trim() || !profile) return;
-    await addDoc(collection(db, 'live_classes'), {
-      title: liveTitle,
-      teacher_id: profile.auth_id,
-      subject: liveSubject,
-      start_time: serverTimestamp(),
-      status: 'upcoming',
-      max_students: 50,
-      current_students: 0
-    });
-    logActivity('جدول حصة مباشرة', `${liveTitle} (${liveSubject})`);
-    setLiveTitle('');
-    setLiveSubject('');
-    setIsLiveModalOpen(false);
-  };
-
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !profile || !selectedUserForChat) return;
-    await addDoc(collection(db, 'messages'), {
-      sender_id: profile.auth_id,
-      receiver_id: selectedUserForChat.auth_id,
-      sender_name: `${profile.first_name} ${profile.last_name}`,
-      sender_image: profile.profile_image || null,
-      content: newMessage,
-      created_at: serverTimestamp()
-    });
-    logActivity('أرسل رسالة', `إلى ${selectedUserForChat.first_name}`);
-    setNewMessage('');
-  };
-
-  const fetchChatMessages = (otherUserId: string) => {
-    if (!profile) return;
-    const q = query(
-      collection(db, 'messages'),
-      where('sender_id', 'in', [profile.auth_id, otherUserId]),
-      where('receiver_id', 'in', [profile.auth_id, otherUserId]),
-      orderBy('created_at', 'asc')
-    );
-    return onSnapshot(q, (snap) => {
-      setChatMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-  };
-
-  const handleJoinLive = (live: LiveClass) => {
-    setSelectedLive(live);
-    setIsLiveModalOpen(true);
-    // In a real app, we'd increment current_students
-  };
-
-  const handleLeaveLive = () => {
-    setIsLiveModalOpen(false);
-    setSelectedLive(null);
-    setIsHandRaised(false);
-    setIsMicOn(false);
-    setIsMicApproved(false);
-  };
-
-  const handleOpenComments = (post: Post) => {
-    setSelectedPostForComments(post);
-    // Fetch comments logic here
-  };
-
-  const handleAddComment = async () => {
-    if (!newComment.trim() || !profile || !selectedPostForComments) return;
-    // Add comment logic here
-    setNewComment('');
-  };
-
-  return (
-    <div className="pb-32">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-100">
-            <BookOpen className="text-white w-7 h-7" />
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tighter">علّمني</h1>
+          <div className="absolute inset-0 bg-black/40 backdrop-grayscale-[0.2]"></div>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-emerald-600 transition-colors relative">
-            <Bell className="w-6 h-6" />
-            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
-          </button>
-          <button 
-            onClick={() => signOut(auth)}
-            className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all"
-          >
-            <LogOut className="w-6 h-6" />
-          </button>
+
+        <div className="relative z-10 text-center px-6 max-w-4xl">
+          <div className="inline-block px-4 py-1 bg-[#C5A059] text-white text-[10px] font-black uppercase tracking-[0.3em] mb-6 animate-fade-in-up">
+            Premium Travel Magazine
+          </div>
+          <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-none mb-8 animate-fade-in-up delay-100">
+            Explore the world through <span className="text-[#C5A059]">stories</span>
+          </h2>
+          <p className="text-xl md:text-2xl text-white/80 font-medium mb-12 max-w-2xl mx-auto animate-fade-in-up delay-200">
+            Discover hidden gems, luxury retreats, and authentic cultural experiences across the globe.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300">
+            <button 
+              onClick={() => document.getElementById('latest')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-10 py-5 bg-white text-[#1A1A1A] font-black uppercase tracking-widest rounded-full hover:bg-[#C5A059] hover:text-white transition-all shadow-2xl flex items-center gap-3"
+            >
+              Start Exploring <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce">
+          <div className="w-px h-12 bg-white/30"></div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-3xl mx-auto p-4 md:p-6">
-        <AnimatePresence mode="wait">
-          {activeTab === 'home' && (
-            <motion.div 
-              key="home"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
-            >
-              {/* Post Creator (Teacher Only) */}
-              {profile?.role === 'teacher' && (
-                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-                  <div className="flex gap-4">
-                    <img 
-                      src={profile.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.auth_id}`} 
-                      className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
-                    />
-                    <button 
-                      onClick={() => setIsPostModalOpen(true)}
-                      className="flex-1 bg-slate-50 rounded-2xl px-6 text-right text-slate-400 font-medium hover:bg-slate-100 transition-colors"
-                    >
-                      ماذا تريد أن تشارك مع طلابك اليوم؟
-                    </button>
-                  </div>
-                </div>
-              )}
+      {/* --- About Section --- */}
+      <section className="py-24 px-6 bg-white">
+        <div className="max-w-4xl mx-auto text-center">
+          <Compass className="w-12 h-12 text-[#C5A059] mx-auto mb-8" />
+          <h3 className="text-3xl md:text-4xl font-black text-[#1A1A1A] mb-8 tracking-tight">
+            A modern travel platform where you discover destinations, restaurants, hotels, and real travel experiences.
+          </h3>
+          <div className="w-24 h-1 bg-[#C5A059] mx-auto"></div>
+        </div>
+      </section>
 
-              {/* Feed */}
-              {posts.map((post) => (
-                <div key={post.id} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <img 
-                        src={post.author_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.author_id}`} 
-                        className="w-12 h-12 rounded-2xl border-2 border-emerald-50"
-                      />
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-lg">{post.author_name}</h4>
-                        <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {post.created_at?.toDate().toLocaleDateString('ar-EG')}
-                        </p>
-                      </div>
-                    </div>
-                    <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl">
-                      <MoreVertical className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  <div className="px-6 pb-6">
-                    <p className="text-slate-700 leading-relaxed text-lg mb-6 whitespace-pre-wrap">{post.content}</p>
-                    {post.image_url && (
-                      <img 
-                        src={post.image_url} 
-                        className="w-full h-80 object-cover rounded-[2rem] mb-6 shadow-sm"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
-                    
-                    <div className="flex items-center gap-6 pt-4 border-t border-slate-50">
-                      <button 
-                        onClick={() => handleLike(post.id)}
-                        className="flex items-center gap-2 text-slate-500 hover:text-red-500 transition-colors group"
-                      >
-                        <Heart className={`w-6 h-6 group-active:scale-125 transition-transform ${post.is_liked ? 'fill-red-500 text-red-500' : ''}`} />
-                        <span className="text-sm font-bold">{post.likes_count || 0}</span>
-                      </button>
-                      <button 
-                        onClick={() => handleOpenComments(post)}
-                        className="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors"
-                      >
-                        <MessageSquare className="w-6 h-6" />
-                        <span className="text-sm font-bold">{post.comments_count || 0}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </motion.div>
-          )}
+      {/* --- Latest Articles --- */}
+      <section id="latest" className="py-24 px-6 max-w-7xl mx-auto">
+        <div className="flex items-end justify-between mb-16">
+          <div>
+            <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-2 block">The Journal</span>
+            <h3 className="text-5xl font-black text-[#1A1A1A] tracking-tighter">Latest Stories</h3>
+          </div>
+          <div className="hidden md:block w-1/3 h-px bg-slate-200 mb-4"></div>
+        </div>
 
-          {activeTab === 'live' && (
-            <motion.div 
-              key="live"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="space-y-6"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">الدروس المباشرة</h2>
-                <div className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-xs font-black flex items-center gap-2 animate-pulse">
-                  <div className="w-2.5 h-2.5 bg-red-600 rounded-full shadow-lg shadow-red-200"></div>
-                  مباشر الآن
-                </div>
-              </div>
-
-              {liveClasses.filter(l => l.status === 'live').map(live => (
-                <div key={live.id} className="bg-emerald-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-emerald-100 relative overflow-hidden group">
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-6 bg-white/10 w-fit px-4 py-2 rounded-2xl backdrop-blur-md">
-                      <Users className="w-5 h-5" />
-                      <span className="text-sm font-bold">{live.current_students} / {live.max_students} طالب</span>
-                    </div>
-                    <h3 className="text-3xl font-black mb-3 tracking-tight">{live.title}</h3>
-                    <p className="text-emerald-100 text-lg mb-8 font-medium">{live.subject}</p>
-                    <button 
-                      onClick={() => { setSelectedLive(live); setIsLiveModalOpen(true); }}
-                      className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-800/20 hover:bg-emerald-50 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                    >
-                      انضم للجلسة
-                    </button>
-                  </div>
-                  <Video className="absolute -bottom-8 -right-8 w-48 h-48 text-white/10 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
-                </div>
-              ))}
-
-              <h3 className="text-xl font-black text-slate-900 mt-10 mb-4">الدروس القادمة</h3>
-              {liveClasses.filter(l => l.status === 'upcoming').map(live => (
-                <div key={live.id} className="bg-white rounded-[2rem] p-6 border border-slate-100 flex items-center gap-5 shadow-sm hover:shadow-md transition-all group">
-                  <div className="w-20 h-20 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-                    <Clock className="w-7 h-7 mb-1" />
-                    <span className="text-xs font-black">{live.start_time?.toDate().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-slate-900 text-lg mb-1">{live.title}</h4>
-                    <p className="text-sm text-slate-500 font-medium">{live.subject}</p>
-                  </div>
-                  <button className="p-3 text-emerald-600 bg-emerald-50 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all">
-                    <ChevronRight className="w-6 h-6" />
-                  </button>
-                </div>
-              ))}
-            </motion.div>
-          )}
-
-          {activeTab === 'messages' && (
-            <motion.div 
-              key="messages"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
-              <h2 className="text-3xl font-black text-slate-900 mb-8 tracking-tight">الرسائل الخاصة</h2>
-              
-              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-50">
-                {messages.length > 0 ? messages.map((msg) => {
-                  const isMe = msg.sender_id === profile?.auth_id;
-                  const otherUserName = isMe ? 'أنت' : msg.sender_name;
-                  const otherUserImage = isMe ? profile?.profile_image : msg.sender_image;
-                  
-                  return (
-                    <button 
-                      key={msg.id} 
-                      onClick={() => {
-                        // In a real app, we'd find the other user object
-                        // For now, we'll just open the chat with what we have
-                        if (!isMe) {
-                          setSelectedUserForChat({ auth_id: msg.sender_id, first_name: msg.sender_name?.split(' ')[0] || '', last_name: msg.sender_name?.split(' ')[1] || '', profile_image: msg.sender_image } as UserProfile);
-                          setIsChatModalOpen(true);
-                          fetchChatMessages(msg.sender_id);
-                        }
-                      }}
-                      className="w-full p-6 flex items-center gap-5 hover:bg-slate-50 transition-all text-right group"
-                    >
-                      <div className="relative">
-                        <img 
-                          src={otherUserImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_id}`} 
-                          className="w-16 h-16 rounded-[1.5rem] border-2 border-emerald-50 shadow-sm"
-                        />
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <h4 className="font-black text-slate-900 text-lg">{otherUserName}</h4>
-                          <span className="text-xs text-slate-400 font-bold">{msg.created_at?.toDate().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                        <p className="text-slate-500 truncate font-medium">{msg.content}</p>
-                      </div>
-                    </button>
-                  );
-                }) : (
-                  <div className="p-20 text-center">
-                    <MessageSquare className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                    <p className="text-slate-400 font-bold">لا توجد رسائل حالياً</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'files' && (
-            <motion.div 
-              key="files"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">المكتبة التعليمية</h2>
-                <div className="flex gap-2">
-                  {profile?.role === 'teacher' && (
-                    <button 
-                      onClick={() => setIsUploadModalOpen(true)}
-                      className="p-3 bg-emerald-600 text-white shadow-lg shadow-emerald-100 rounded-2xl hover:bg-emerald-700 transition-all flex items-center gap-2"
-                    >
-                      <Plus className="w-6 h-6" />
-                      <span className="text-sm font-bold">رفع محتوى</span>
-                    </button>
-                  )}
-                  <button className="p-3 bg-white shadow-sm border border-slate-100 text-emerald-600 rounded-2xl hover:scale-110 transition-transform">
-                    <Search className="w-6 h-6" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Subjects Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                {['الرياضيات', 'الفيزياء', 'العلوم', 'الأدب'].map((subject) => {
-                  const subjectFiles = lessonFiles.filter(f => f.subject === subject).length;
-                  return (
-                    <div key={subject} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 text-center hover:shadow-xl hover:shadow-emerald-100/20 transition-all cursor-pointer group">
-                      <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:bg-emerald-600 transition-all duration-500">
-                        <FileText className="text-emerald-600 w-8 h-8 group-hover:text-white transition-colors" />
-                      </div>
-                      <h4 className="font-black text-slate-900 text-lg mb-1">{subject}</h4>
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{subjectFiles} ملف متاح</p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Videos Section */}
-              <div>
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                  <PlayCircle className="text-emerald-600 w-6 h-6" />
-                  فيديوهات توضيحية قصيرة
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {explainVideos.map(video => (
-                    <div key={video.id} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 group">
-                      <div className="relative h-48 bg-slate-900">
-                        <img src={video.thumbnail_url || `https://picsum.photos/seed/${video.id}/400/300`} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center group-hover:scale-125 transition-transform duration-500">
-                            <PlayCircle className="text-white w-10 h-10" />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="p-5">
-                        <h4 className="font-bold text-slate-900 mb-1">{video.title}</h4>
-                        <p className="text-xs text-slate-500 font-medium">{video.subject}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Files List */}
-              <div>
-                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                  <Download className="text-emerald-600 w-6 h-6" />
-                  أحدث الملفات
-                </h3>
-                <div className="space-y-4">
-                  {lessonFiles.map(file => (
-                    <div key={file.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center gap-5 hover:shadow-md transition-shadow">
-                      <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 font-black text-xs">
-                        PDF
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-slate-900 mb-1">{file.title}</h4>
-                        <p className="text-xs text-slate-400 font-bold">{file.subject} • 2.4 MB</p>
-                      </div>
-                      <button className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all">
-                        <Download className="w-6 h-6" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'profile' && (
-            <motion.div 
-              key="profile"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="space-y-8"
-            >
-              <div className="bg-white rounded-[3rem] p-10 text-center shadow-xl shadow-slate-200/50 border border-slate-100 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-32 bg-emerald-600/5"></div>
-                <div className="relative inline-block mb-6">
-                  <img 
-                    src={profile?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.auth_id}`} 
-                    className="w-40 h-40 rounded-[2.5rem] border-8 border-white shadow-2xl relative z-10"
-                  />
-                  <button className="absolute -bottom-2 -right-2 bg-emerald-600 text-white p-3 rounded-2xl shadow-xl z-20 hover:scale-110 transition-transform">
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">{profile?.first_name} {profile?.last_name}</h2>
-                <div className="flex items-center justify-center gap-2 mb-8">
-                  <span className="bg-emerald-100 text-emerald-700 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-                    {profile?.role === 'student' ? 'طالب متميز' : 'أستاذ معتمد'}
+        <div className="grid md:grid-cols-3 gap-12">
+          {latestArticles.map((article, idx) => (
+            <div key={article.id} className="group cursor-pointer">
+              <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem] mb-8 shadow-xl">
+                <img 
+                  src={article.images[0]} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  alt={article.title}
+                />
+                <div className="absolute top-6 left-6">
+                  <span className="px-4 py-2 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest text-[#1A1A1A]">
+                    {article.category}
                   </span>
                 </div>
-                
-                <div className="grid grid-cols-3 gap-6 border-t border-slate-50 pt-8">
-                  <div>
-                    <p className="text-2xl font-black text-slate-900">
-                      {profile?.role === 'teacher' ? lessonFiles.filter(f => f.uploaded_by === profile.auth_id).length : posts.filter(p => p.author_id === profile?.auth_id).length}
-                    </p>
-                    <p className="text-xs text-slate-400 font-bold uppercase mt-1">{profile?.role === 'teacher' ? 'ملفات' : 'منشورات'}</p>
-                  </div>
-                  <div className="border-x border-slate-50">
-                    <p className="text-2xl font-black text-slate-900">450</p>
-                    <p className="text-xs text-slate-400 font-bold uppercase mt-1">نقاط</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-black text-slate-900">8</p>
-                    <p className="text-xs text-slate-400 font-bold uppercase mt-1">أوسمة</p>
-                  </div>
-                </div>
               </div>
-
-              <div className="space-y-4">
-                <button className="w-full bg-white p-6 rounded-[2rem] border border-slate-100 flex items-center justify-between group hover:bg-emerald-600 transition-all duration-500">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                      <Settings className="text-slate-400 group-hover:text-white w-6 h-6" />
-                    </div>
-                    <span className="font-bold text-slate-700 group-hover:text-white text-lg">إعدادات الحساب</span>
-                  </div>
-                  <ChevronRight className="text-slate-300 group-hover:text-white w-6 h-6" />
-                </button>
-                
-                <button 
-                  onClick={() => signOut(auth)}
-                  className="w-full bg-red-50 p-6 rounded-[2rem] border border-red-100 flex items-center justify-between group hover:bg-red-600 transition-all duration-500"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
-                      <LogOut className="text-red-600 w-6 h-6" />
-                    </div>
-                    <span className="font-bold text-red-600 group-hover:text-white text-lg">تسجيل الخروج</span>
-                  </div>
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex items-center justify-between z-40 shadow-2xl shadow-slate-900/10">
-        {[
-          { id: 'home', icon: Home, label: 'الرئيسية' },
-          { id: 'live', icon: Video, label: 'مباشر' },
-          { id: 'messages', icon: MessageSquare, label: 'رسائل' },
-          { id: 'files', icon: FileText, label: 'مكتبة' },
-          { id: 'profile', icon: User, label: 'حسابي' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex flex-col items-center gap-1.5 transition-all duration-300 relative ${activeTab === tab.id ? 'text-emerald-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}
-          >
-            <tab.icon className={`w-7 h-7 ${activeTab === tab.id ? 'fill-emerald-600/10' : ''}`} />
-            <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
-            {activeTab === tab.id && (
-              <motion.div 
-                layoutId="activeTab"
-                className="absolute -top-4 w-12 h-1.5 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200"
-              />
-            )}
-          </button>
-        ))}
-      </nav>
-
-      {/* Modals */}
-      <AnimatePresence>
-        {isLiveModalOpen && selectedLive && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900 flex flex-col"
-          >
-            {/* Header */}
-            <div className="p-6 flex items-center justify-between bg-slate-900/50 backdrop-blur-md border-b border-white/10">
-              <div className="flex items-center gap-4">
-                <button 
-                  onClick={handleLeaveLive}
-                  className="p-2 text-white hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-                <div>
-                  <h3 className="text-white font-black text-lg">{selectedLive.title}</h3>
-                  <p className="text-slate-400 text-xs font-bold">الأستاذ {selectedLive.teacher?.first_name}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-red-500 text-white px-3 py-1 rounded-lg text-[10px] font-black animate-pulse">LIVE</div>
-                <div className="text-white/60 text-xs font-bold flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  {selectedLive.current_students}
-                </div>
-              </div>
-            </div>
-
-            {/* Video Area (Simulated) */}
-            <div className="flex-1 relative flex items-center justify-center bg-slate-950 overflow-hidden">
-              <div className="absolute inset-0 opacity-20">
-                <img src="https://picsum.photos/seed/live-bg/1200/800" className="w-full h-full object-cover blur-3xl" />
-              </div>
-              
-              {/* Teacher View */}
-              <div className="relative z-10 w-full max-w-4xl aspect-video bg-slate-800 rounded-[3rem] shadow-2xl border-4 border-white/5 flex items-center justify-center overflow-hidden group">
-                <img src={selectedLive.teacher?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedLive.teacher_id}`} className="w-48 h-48 rounded-full border-8 border-emerald-500/20" />
-                <div className="absolute bottom-8 left-8 bg-black/40 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
-                  <p className="text-white font-black text-lg">الأستاذ {selectedLive.teacher?.first_name} {selectedLive.teacher?.last_name}</p>
-                </div>
-                <div className="absolute top-8 right-8 flex gap-2">
-                  <div className="bg-emerald-500 p-3 rounded-2xl shadow-lg">
-                    <Mic className="text-white w-6 h-6" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Floating Hand Notification */}
-              <AnimatePresence>
-                {isHandRaised && (
-                  <motion.div 
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -50, opacity: 0 }}
-                    className="absolute top-24 left-1/2 -translate-x-1/2 bg-amber-500 text-white px-8 py-4 rounded-[2rem] shadow-2xl flex items-center gap-4 z-30 border-4 border-white/20"
-                  >
-                    <Hand className="w-8 h-8 animate-bounce" />
-                    <span className="text-xl font-black">لقد رفعت يدك!</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Controls */}
-            <div className="p-8 bg-slate-900 border-t border-white/10 flex items-center justify-center gap-6">
-              <button 
-                onClick={() => setIsHandRaised(!isHandRaised)}
-                className={`w-20 h-20 rounded-[2rem] flex items-center justify-center transition-all duration-500 shadow-2xl ${isHandRaised ? 'bg-amber-500 text-white scale-110 rotate-12' : 'bg-white/5 text-white hover:bg-white/10'}`}
-              >
-                <Hand className="w-10 h-10" />
-              </button>
-              
-              <button 
-                disabled={!isMicApproved}
-                onClick={() => setIsMicOn(!isMicOn)}
-                className={`w-24 h-24 rounded-[2.5rem] flex items-center justify-center transition-all duration-500 shadow-2xl ${!isMicApproved ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : isMicOn ? 'bg-emerald-500 text-white scale-110' : 'bg-white/5 text-white hover:bg-white/10'}`}
-              >
-                {isMicOn ? <Mic className="w-12 h-12" /> : <MicOff className="w-12 h-12" />}
-              </button>
-
-              <button 
-                onClick={handleLeaveLive}
-                className="w-20 h-20 bg-red-500 text-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-red-500/20 hover:bg-red-600 hover:scale-110 transition-all"
-              >
-                <LogOut className="w-10 h-10" />
+              <h4 className="text-2xl font-black text-[#1A1A1A] mb-4 group-hover:text-[#C5A059] transition-colors">
+                {article.title}
+              </h4>
+              <p className="text-slate-500 font-medium mb-6 line-clamp-2">
+                {article.preview}
+              </p>
+              <button className="flex items-center gap-2 text-[#C5A059] font-black uppercase tracking-widest text-xs group-hover:gap-4 transition-all">
+                Read More <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+          ))}
+        </div>
+      </section>
 
-            {/* Mic Approval Simulation for Demo */}
-            {isHandRaised && !isMicApproved && (
-              <div className="absolute bottom-36 left-1/2 -translate-x-1/2">
-                <button 
-                  onClick={() => setIsMicApproved(true)}
-                  className="bg-white/10 backdrop-blur-md text-white/40 text-[10px] px-4 py-2 rounded-full hover:text-white transition-colors"
-                >
-                  (محاكاة: الأستاذ يوافق على المايك)
-                </button>
-              </div>
-            )}
-          </motion.div>
-        )}
+      {/* --- Trending Countries (Horizontal Scroll) --- */}
+      <section className="py-24 bg-[#1A1A1A] text-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 mb-16">
+          <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-2 block">World Tour</span>
+          <h3 className="text-5xl font-black tracking-tighter">Trending Destinations</h3>
+        </div>
 
-        {isUploadModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl"
+        <div className="flex gap-8 overflow-x-auto px-6 pb-12 no-scrollbar snap-x">
+          {TRENDING_COUNTRIES.map((country) => (
+            <div 
+              key={country.name} 
+              className="flex-none w-72 md:w-96 aspect-[3/4] relative rounded-[2.5rem] overflow-hidden group snap-center cursor-pointer shadow-2xl"
             >
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-2xl font-black text-slate-900">رفع محتوى تعليمي</h3>
-                <button onClick={() => setIsUploadModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                  <X className="w-6 h-6 text-slate-400" />
-                </button>
-              </div>
-              
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <input 
-                    type="text"
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    placeholder="عنوان المحتوى"
-                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                  <select 
-                    value={uploadSubject}
-                    onChange={(e) => setUploadSubject(e.target.value)}
-                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                  >
-                    <option value="">اختر المادة</option>
-                    <option value="الرياضيات">الرياضيات</option>
-                    <option value="الفيزياء">الفيزياء</option>
-                    <option value="العلوم">العلوم</option>
-                    <option value="الأدب">الأدب</option>
-                  </select>
-                  <div className="flex gap-4">
-                    <button 
-                      onClick={() => setUploadType('file')}
-                      className={`flex-1 py-3 rounded-xl font-bold transition-all ${uploadType === 'file' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}
-                    >
-                      ملف PDF
-                    </button>
-                    <button 
-                      onClick={() => setUploadType('video')}
-                      className={`flex-1 py-3 rounded-xl font-bold transition-all ${uploadType === 'video' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500'}`}
-                    >
-                      فيديو
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border-4 border-dashed border-slate-100 rounded-[2rem] p-12 text-center hover:border-emerald-200 transition-colors cursor-pointer group">
-                  <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4 group-hover:bg-emerald-50 transition-colors">
-                    <Plus className="w-10 h-10 text-slate-300 group-hover:text-emerald-500" />
-                  </div>
-                  <p className="text-slate-400 font-bold">اسحب الملف هنا أو اضغط للاختيار</p>
-                  <p className="text-[10px] text-slate-300 font-black uppercase mt-2 tracking-widest">PDF, DOCX, MP4 (Max 50MB)</p>
-                </div>
-                
-                <button 
-                  onClick={handleUpload}
-                  className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
-                >
-                  تأكيد الرفع
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isPostModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl"
-            >
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-2xl font-black text-slate-900">إنشاء منشور جديد</h3>
-                <button onClick={() => setIsPostModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                  <X className="w-6 h-6 text-slate-400" />
-                </button>
-              </div>
-              
-              <textarea 
-                value={postContent}
-                onChange={(e) => setPostContent(e.target.value)}
-                placeholder="ماذا يدور في ذهنك؟"
-                className="w-full h-48 bg-slate-50 rounded-[2rem] p-6 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none resize-none mb-6"
+              <img 
+                src={country.image} 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                alt={country.name}
               />
-              
-              <button 
-                onClick={handleCreatePost}
-                className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all"
-              >
-                نشر الآن
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {selectedPostForComments && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-white w-full max-w-lg rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
-            >
-              <div className="p-8 border-b border-slate-50 flex items-center justify-between">
-                <h3 className="text-xl font-black text-slate-900">التعليقات</h3>
-                <button onClick={() => setSelectedPostForComments(null)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                  <X className="w-6 h-6 text-slate-400" />
-                </button>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
+              <div className="absolute bottom-10 left-10">
+                <h5 className="text-3xl font-black tracking-tighter mb-2">{country.name}</h5>
+                <div className="w-0 group-hover:w-12 h-1 bg-[#C5A059] transition-all duration-500"></div>
               </div>
-              
-              <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar">
-                {comments.length > 0 ? comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-4">
-                    <img src={comment.author_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_id}`} className="w-10 h-10 rounded-xl" />
-                    <div className="flex-1 bg-slate-50 p-4 rounded-2xl">
-                      <div className="flex justify-between items-center mb-1">
-                        <h5 className="font-bold text-slate-900 text-sm">{comment.author_name}</h5>
-                        <span className="text-[10px] text-slate-400 font-bold">{new Date(comment.created_at).toLocaleTimeString('ar-EG')}</span>
-                      </div>
-                      <p className="text-slate-600 text-sm leading-relaxed">{comment.content}</p>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="text-center py-10">
-                    <p className="text-slate-400 font-bold">لا توجد تعليقات بعد. كن أول من يعلق!</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-                <input 
-                  type="text"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="اكتب تعليقك هنا..."
-                  className="flex-1 bg-white rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                />
-                <button 
-                  onClick={handleAddComment}
-                  className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
-                >
-                  <Send className="w-6 h-6" />
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isChatModalOpen && selectedUserForChat && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-900 flex flex-col"
-          >
-            {/* Header */}
-            <div className="p-6 bg-white border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button onClick={() => setIsChatModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                  <ChevronRight className="w-6 h-6 text-slate-400" />
-                </button>
-                <div className="flex items-center gap-3">
-                  <img src={selectedUserForChat.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUserForChat.auth_id}`} className="w-10 h-10 rounded-xl" />
-                  <div>
-                    <h3 className="font-black text-slate-900">{selectedUserForChat.first_name} {selectedUserForChat.last_name}</h3>
-                    <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">نشط الآن</p>
-                  </div>
-                </div>
-              </div>
-              <button className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
-                <MoreVertical className="w-6 h-6 text-slate-400" />
-              </button>
             </div>
+          ))}
+        </div>
+      </section>
 
-            {/* Messages Area */}
-            <div className="flex-1 bg-slate-50 overflow-y-auto p-6 space-y-4 no-scrollbar">
-              {chatMessages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.sender_id === profile?.auth_id ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${msg.sender_id === profile?.auth_id ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-white text-slate-700 rounded-tl-none'}`}>
-                    <p className="font-medium leading-relaxed">{msg.content}</p>
-                    <p className={`text-[9px] mt-1 font-bold uppercase ${msg.sender_id === profile?.auth_id ? 'text-emerald-100' : 'text-slate-300'}`}>
-                      {msg.created_at?.toDate().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Input Area */}
-            <div className="p-6 bg-white border-t border-slate-100 flex gap-3">
-              <button className="p-4 text-slate-400 hover:bg-slate-50 rounded-2xl transition-all">
-                <Plus className="w-6 h-6" />
-              </button>
-              <input 
-                type="text" 
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="اكتب رسالتك هنا..."
-                className="flex-1 bg-slate-50 rounded-2xl px-6 py-4 text-slate-700 font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              />
-              <button 
-                onClick={handleSendMessage}
-                className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
-              >
-                <Send className="w-6 h-6" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// --- Admin Area ---
-
-function AdminArea({ profile, adminTab, setAdminTab, logActivity }: { profile: UserProfile | null, adminTab: string, setAdminTab: (t: string) => void, logActivity: (a: string, d: string) => void }) {
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [activityLogs, setActivityLogs] = useState<any[]>([]);
-  const [liveClassesCount, setLiveClassesCount] = useState(0);
-  const [totalLogs, setTotalLogs] = useState(0);
-
-  useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
-    });
-
-    const unsubLogs = onSnapshot(query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(10)), (snap) => {
-      setActivityLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    const unsubTotalLogs = onSnapshot(collection(db, 'activity_logs'), (snap) => {
-      setTotalLogs(snap.size);
-    });
-
-    const unsubLive = onSnapshot(collection(db, 'live_classes'), (snap) => {
-      setLiveClassesCount(snap.docs.filter(d => d.data().status === 'live').length);
-    });
-
-    return () => { unsubUsers(); unsubLogs(); unsubTotalLogs(); unsubLive(); };
-  }, []);
-
-  const handleApproveTeacher = async (userId: string) => {
-    try {
-      await updateDoc(doc(db, 'users', userId), {
-        account_status: 'approved'
-      });
-      const user = allUsers.find(u => u.id === userId);
-      logActivity('وافق على أستاذ', `تم قبول طلب ${user?.first_name} ${user?.last_name}`);
-    } catch (error) {
-      console.error("Error approving teacher:", error);
-    }
-  };
-
-  const handleRejectTeacher = async (userId: string) => {
-    try {
-      await updateDoc(doc(db, 'users', userId), {
-        account_status: 'rejected'
-      });
-      const user = allUsers.find(u => u.id === userId);
-      logActivity('رفض أستاذ', `تم رفض طلب ${user?.first_name} ${user?.last_name}`);
-    } catch (error) {
-      console.error("Error rejecting teacher:", error);
-    }
-  };
-
-  const handleFreezeAccount = async (userId: string, currentStatus: string) => {
-    try {
-      const newStatus = currentStatus === 'frozen' ? 'approved' : 'frozen';
-      await updateDoc(doc(db, 'users', userId), {
-        account_status: newStatus
-      });
-      const user = allUsers.find(u => u.id === userId);
-      logActivity(newStatus === 'frozen' ? 'جمد حساب' : 'ألغى تجميد حساب', `المستخدم: ${user?.first_name} ${user?.last_name}`);
-    } catch (error) {
-      console.error("Error freezing account:", error);
-    }
-  };
-
-  return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <aside className="w-80 bg-white border-l border-slate-100 p-8 flex flex-col">
-        <div className="flex items-center gap-4 mb-12">
-          <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-100">
-            <ShieldCheck className="text-white w-7 h-7" />
-          </div>
+      {/* --- All Articles Grid --- */}
+      <section className="py-24 px-6 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-16 gap-8">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter">لوحة الإدارة</h1>
-            <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">نظام علّمني</p>
+            <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-2 block">Archive</span>
+            <h3 className="text-5xl font-black text-[#1A1A1A] tracking-tighter">
+              {activeCategory === "Home" ? "All Experiences" : `${activeCategory}`}
+            </h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map(cat => (
+              <button 
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                  activeCategory === cat 
+                    ? 'bg-[#C5A059] text-white shadow-lg shadow-[#C5A059]/20' 
+                    : 'bg-white text-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          {[
-            { id: 'dashboard', icon: Layout, label: 'الرئيسية' },
-            { id: 'stats', icon: BarChart3, label: 'الإحصائيات' },
-            { id: 'students', icon: Users, label: 'الطلاب' },
-            { id: 'teachers', icon: UserCheck, label: 'الأساتذة' },
-            { id: 'approvals', icon: CheckCircle, label: 'طلبات الانضمام' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setAdminTab(item.id)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-bold transition-all ${adminTab === item.id ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
-            >
-              <item.icon className="w-6 h-6" />
-              <span>{item.label}</span>
-            </button>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {filteredArticles.map((article) => (
+            <div key={article.id} className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-slate-100 group hover:shadow-xl transition-all duration-500">
+              <div className="relative aspect-video overflow-hidden rounded-[2rem] mb-6">
+                <img 
+                  src={article.images[0]} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  alt={article.title}
+                />
+                <div className="absolute bottom-4 left-4">
+                  <span className="px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-[8px] font-black uppercase tracking-widest text-[#1A1A1A]">
+                    {article.category}
+                  </span>
+                </div>
+              </div>
+              <div className="px-4 pb-4">
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                  <Clock className="w-3 h-3" /> {article.date}
+                </div>
+                <h4 className="text-xl font-black text-[#1A1A1A] mb-3 group-hover:text-[#C5A059] transition-colors">
+                  {article.title}
+                </h4>
+                <p className="text-slate-500 text-sm font-medium line-clamp-2 mb-6">
+                  {article.preview}
+                </p>
+                <div className="flex items-center justify-between">
+                  <button className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors">
+                    <Heart className="w-5 h-5" />
+                  </button>
+                  <button className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] flex items-center gap-2">
+                    Read <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           ))}
-        </nav>
+        </div>
 
-        <button 
-          onClick={() => signOut(auth)}
-          className="mt-auto flex items-center gap-4 p-4 rounded-2xl font-bold text-red-500 hover:bg-red-50 transition-all"
-        >
-          <LogOut className="w-6 h-6" />
-          <span>تسجيل الخروج</span>
-        </button>
-      </aside>
+        {filteredArticles.length === 0 && (
+          <div className="py-24 text-center">
+            <Navigation className="w-16 h-16 text-slate-200 mx-auto mb-6" />
+            <p className="text-slate-400 font-bold uppercase tracking-widest">No stories found in this category yet.</p>
+          </div>
+        )}
+      </section>
 
-      {/* Content Area */}
-      <main className="flex-1 p-12 overflow-y-auto">
-        <AnimatePresence mode="wait">
-          {adminTab === 'dashboard' && (
-            <motion.div 
-              key="dashboard"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">مرحباً بك، {profile?.first_name}</h2>
-                <div className="flex gap-2">
-                  <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <BarChart3 className="text-emerald-600 w-6 h-6" />
+      {/* --- Footer --- */}
+      <footer className="bg-white border-t border-slate-100 py-24 px-6">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-16">
+          <div className="md:col-span-2">
+            <div className="flex items-center gap-2 mb-8">
+              <Globe className="w-10 h-10 text-[#C5A059]" />
+              <h1 className="text-3xl font-black tracking-tighter uppercase text-[#1A1A1A]">
+                Atlas <span className="text-[#C5A059]">Escape</span>
+              </h1>
+            </div>
+            <p className="text-slate-500 font-medium text-lg max-w-md leading-relaxed">
+              We are a global community of travelers, storytellers, and dreamers. Join us as we explore the most beautiful corners of our planet.
+            </p>
+          </div>
+          <div>
+            <h6 className="text-xs font-black uppercase tracking-widest text-[#1A1A1A] mb-8">Explore</h6>
+            <ul className="space-y-4">
+              {CATEGORIES.map(cat => (
+                <li key={cat}>
+                  <button onClick={() => setActiveCategory(cat)} className="text-slate-500 font-bold hover:text-[#C5A059] transition-colors">{cat}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h6 className="text-xs font-black uppercase tracking-widest text-[#1A1A1A] mb-8">Newsletter</h6>
+            <p className="text-slate-500 text-sm mb-6">Get the latest stories delivered to your inbox.</p>
+            <div className="flex gap-2">
+              <input 
+                type="email" 
+                placeholder="Email address" 
+                className="flex-1 bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-[#C5A059] outline-none"
+              />
+              <button className="p-4 bg-[#1A1A1A] text-white rounded-2xl hover:bg-[#C5A059] transition-all">
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto mt-24 pt-8 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-8">
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2024 Atlas Escape. All rights reserved.</p>
+          <div className="flex gap-8">
+            <button className="text-slate-400 hover:text-[#C5A059] transition-colors"><Globe className="w-5 h-5" /></button>
+            <button className="text-slate-400 hover:text-[#C5A059] transition-colors"><MapPin className="w-5 h-5" /></button>
+            <button className="text-slate-400 hover:text-[#C5A059] transition-colors"><Search className="w-5 h-5" /></button>
+          </div>
+        </div>
+      </footer>
+
+      {/* --- Admin Modal --- */}
+      <AnimatePresence>
+        {isAdminOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-[#1A1A1A]/90 backdrop-blur-xl" onClick={() => setIsAdminOpen(false)}></div>
+            <div className="relative bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-modal-in">
+              <div className="p-12">
+                <div className="flex items-center justify-between mb-12">
+                  <div>
+                    <span className="text-[#C5A059] font-black uppercase tracking-widest text-[10px] mb-2 block">Editor Panel</span>
+                    <h3 className="text-4xl font-black text-[#1A1A1A] tracking-tighter">Publish New Story</h3>
                   </div>
+                  <button onClick={() => setIsAdminOpen(false)} className="p-4 bg-slate-50 text-slate-400 rounded-3xl hover:bg-red-50 hover:text-red-500 transition-all">
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
-              </div>
 
-              {/* Stats Grid */}
-              <div className="grid grid-cols-4 gap-6">
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                  <p className="text-slate-400 text-xs font-black uppercase mb-2">إجمالي الطلاب</p>
-                  <h3 className="text-4xl font-black text-slate-900">{allUsers.filter(u => u.role === 'student').length}</h3>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                  <p className="text-slate-400 text-xs font-black uppercase mb-2">إجمالي الأساتذة</p>
-                  <h3 className="text-4xl font-black text-slate-900">{allUsers.filter(u => u.role === 'teacher').length}</h3>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                  <p className="text-slate-400 text-xs font-black uppercase mb-2">البث المباشر</p>
-                  <h3 className="text-4xl font-black text-slate-900">{liveClassesCount}</h3>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                  <p className="text-slate-400 text-xs font-black uppercase mb-2">سجل النشاطات</p>
-                  <h3 className="text-4xl font-black text-slate-900">{totalLogs}</h3>
-                </div>
-              </div>
+                <form onSubmit={handlePublish} className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">Story Title</label>
+                    <input 
+                      type="text" 
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="e.g. The Hidden Temples of Bali"
+                      className="w-full bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 text-lg font-bold text-slate-900 focus:ring-2 focus:ring-[#C5A059] outline-none transition-all"
+                      required
+                    />
+                  </div>
 
-              {/* Activity Logs */}
-              <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">
-                <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3">
-                  <Clock className="text-emerald-600 w-8 h-8" />
-                  سجل النشاطات الأخير
-                </h3>
-                <div className="space-y-8">
-                  {activityLogs.map((log) => (
-                    <div key={log.id} className="flex items-start gap-6 group">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500 mt-3 shadow-lg shadow-emerald-200 group-hover:scale-150 transition-transform"></div>
-                      <div className="flex-1">
-                        <p className="text-slate-800 font-bold text-lg">
-                          <span className="text-emerald-600">{log.user_name}</span> {log.action}
-                        </p>
-                        <p className="text-sm text-slate-400 font-medium mt-1">{log.details}</p>
-                        <p className="text-xs text-slate-300 font-black uppercase mt-2 tracking-tighter">
-                          {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleTimeString('ar-EG') : new Date().toLocaleTimeString('ar-EG')}
-                        </p>
-                      </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">Category</label>
+                      <select 
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        className="w-full bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 font-bold text-slate-900 focus:ring-2 focus:ring-[#C5A059] outline-none appearance-none cursor-pointer"
+                      >
+                        {CATEGORIES.slice(1).map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {adminTab === 'stats' && (
-            <motion.div 
-              key="stats"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="space-y-8"
-            >
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">إحصائيات الزوار</h2>
-              <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100">
-                <div className="h-80 flex items-end justify-between gap-4">
-                  {[40, 70, 45, 90, 65, 85, 55].map((h, i) => (
-                    <div key={i} className="flex-1 bg-emerald-100 rounded-t-2xl relative group">
-                      <motion.div 
-                        initial={{ height: 0 }}
-                        animate={{ height: `${h}%` }}
-                        className="bg-emerald-600 rounded-t-2xl w-full absolute bottom-0 group-hover:bg-emerald-700 transition-colors"
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">Media</label>
+                      <button 
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 font-bold text-slate-400 hover:bg-slate-100 transition-all flex items-center justify-center gap-3"
+                      >
+                        <ImageIcon className="w-5 h-5" />
+                        {newImages.length > 0 ? `${newImages.length} Images` : 'Upload Images'}
+                      </button>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleImageUpload}
+                        multiple
+                        accept="image/*"
+                        className="hidden"
                       />
-                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-3 py-1 rounded-lg text-xs font-black opacity-0 group-hover:opacity-100 transition-opacity">
-                        {h * 12}
-                      </div>
                     </div>
-                  ))}
-                </div>
-                <div className="flex justify-between mt-6 text-slate-400 font-bold text-sm">
-                  <span>الأحد</span>
-                  <span>الاثنين</span>
-                  <span>الثلاثاء</span>
-                  <span>الأربعاء</span>
-                  <span>الخميس</span>
-                  <span>الجمعة</span>
-                  <span>السبت</span>
-                </div>
-              </div>
-            </motion.div>
-          )}
+                  </div>
 
-          {adminTab === 'students' && (
-            <motion.div 
-              key="students"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-8"
-            >
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">قائمة الطلاب</h2>
-              <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-                <table className="w-full text-right">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="p-6 font-black text-slate-900">الطالب</th>
-                      <th className="p-6 font-black text-slate-900">البريد الإلكتروني</th>
-                      <th className="p-6 font-black text-slate-900">تاريخ الانضمام</th>
-                      <th className="p-6 font-black text-slate-900">الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {allUsers.filter(u => u.role === 'student').map(u => (
-                      <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-6 flex items-center gap-4">
-                          <img src={u.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} className="w-12 h-12 rounded-xl" />
-                          <span className="font-bold text-slate-900">{u.first_name} {u.last_name}</span>
-                        </td>
-                        <td className="p-6 text-slate-500 font-medium">{u.email}</td>
-                        <td className="p-6 text-slate-400 text-sm">{u.created_at?.toDate().toLocaleDateString('ar-EG')}</td>
-                        <td className="p-6">
-                          <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">نشط</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          )}
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">The Story</label>
+                    <textarea 
+                      value={newContent}
+                      onChange={(e) => setNewContent(e.target.value)}
+                      placeholder="Share the experience..."
+                      rows={6}
+                      className="w-full bg-slate-50 border-none rounded-[2rem] px-8 py-6 text-lg font-medium text-slate-700 focus:ring-2 focus:ring-[#C5A059] outline-none transition-all resize-none"
+                      required
+                    ></textarea>
+                  </div>
 
-          {adminTab === 'teachers' && (
-            <motion.div 
-              key="teachers"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="space-y-8"
-            >
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">قائمة الأساتذة</h2>
-              <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-                <table className="w-full text-right">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="p-6 font-black text-slate-900">الأستاذ</th>
-                      <th className="p-6 font-black text-slate-900">البريد الإلكتروني</th>
-                      <th className="p-6 font-black text-slate-900">الحالة</th>
-                      <th className="p-6 font-black text-slate-900">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {allUsers.filter(u => u.role === 'teacher' && u.account_status === 'approved').map(u => (
-                      <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-6 flex items-center gap-4">
-                          <img src={u.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} className="w-12 h-12 rounded-xl" />
-                          <span className="font-bold text-slate-900">{u.first_name} {u.last_name}</span>
-                        </td>
-                        <td className="p-6 text-slate-500 font-medium">{u.email}</td>
-                        <td className="p-6">
-                          <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">معتمد</span>
-                        </td>
-                        <td className="p-6">
-                          <button 
-                            onClick={() => handleFreezeAccount(u.id, u.account_status)}
-                            className={`${u.account_status === 'frozen' ? 'text-emerald-600' : 'text-red-500'} font-bold hover:underline`}
-                          >
-                            {u.account_status === 'frozen' ? 'إلغاء التجميد' : 'تجميد الحساب'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  <button 
+                    type="submit"
+                    className="w-full bg-[#1A1A1A] text-white py-6 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl hover:bg-[#C5A059] transition-all transform active:scale-95"
+                  >
+                    Publish Article
+                  </button>
+                </form>
               </div>
-            </motion.div>
-          )}
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
 
-          {adminTab === 'approvals' && (
-            <motion.div 
-              key="approvals"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
-            >
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">طلبات انضمام الأساتذة</h2>
-              
-              <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="divide-y divide-slate-50">
-                  {allUsers.filter(u => u.role === 'teacher' && u.account_status === 'pending').map((u) => (
-                    <div key={u.id} className="p-8 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-6">
-                        <img src={u.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} className="w-20 h-20 rounded-[1.5rem] bg-slate-100 border-2 border-emerald-50 shadow-sm" />
-                        <div>
-                          <h4 className="font-black text-slate-900 text-xl">{u.first_name} {u.last_name}</h4>
-                          <p className="text-slate-500 font-medium">{u.email}</p>
-                          <div className="flex gap-2 mt-2">
-                            <span className="bg-amber-100 text-amber-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">قيد المراجعة</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <button 
-                          onClick={() => handleApproveTeacher(u.id)}
-                          className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
-                        >
-                          قبول الطلب
-                        </button>
-                        <button 
-                          onClick={() => handleRejectTeacher(u.id)}
-                          className="bg-red-50 text-red-600 px-8 py-3 rounded-2xl font-black hover:bg-red-100 transition-all"
-                        >
-                          رفض
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {allUsers.filter(u => u.role === 'teacher' && u.account_status === 'pending').length === 0 && (
-                    <div className="p-20 text-center">
-                      <UserCheck className="w-20 h-20 text-slate-100 mx-auto mb-6" />
-                      <p className="text-slate-400 font-black text-xl">لا توجد طلبات معلقة حالياً</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+      {/* --- Floating Admin Button --- */}
+      <button 
+        onClick={() => setIsAdminOpen(true)}
+        className="fixed bottom-10 right-10 z-50 w-16 h-16 bg-[#C5A059] text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all active:scale-90"
+      >
+        <Settings className="w-8 h-8 animate-spin-slow" />
+      </button>
+
+      {/* --- Styles --- */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body {
+          font-family: 'Poppins', sans-serif;
+          overflow-x: hidden;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        @keyframes slow-zoom {
+          from { transform: scale(1); }
+          to { transform: scale(1.1); }
+        }
+        .animate-slow-zoom {
+          animation: slow-zoom 20s infinite alternate ease-in-out;
+        }
+
+        @keyframes fade-in-up {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+          animation: fade-in-up 1s forwards cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+
+        @keyframes modal-in {
+          from { opacity: 0; transform: scale(0.9) translateY(20px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-modal-in {
+          animation: modal-in 0.6s forwards cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .animate-spin-slow {
+          animation: spin 8s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 }
+
+// --- Helper Components ---
+const AnimatePresence = ({ children }: { children: React.ReactNode }) => {
+  return <>{children}</>;
+};
+
+const Send = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="22" y1="2" x2="11" y2="13"></line>
+    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+  </svg>
+);
