@@ -13,7 +13,11 @@ import {
   Globe,
   Compass,
   Navigation,
-  Heart
+  Heart,
+  Send,
+  Camera,
+  LayoutGrid,
+  ListFilter
 } from 'lucide-react';
 
 // --- Types ---
@@ -28,54 +32,63 @@ interface Article {
 }
 
 const CATEGORIES = [
-  "Home",
-  "Arab Countries",
-  "European Countries",
-  "American Countries",
-  "Asian Countries"
+  "الرئيسية",
+  "البلدان العربية",
+  "البلدان الأوروبية",
+  "البلدان الأمريكية",
+  "البلدان الآسيوية"
 ];
 
+const CATEGORY_MAP: Record<string, string> = {
+  "Home": "الرئيسية",
+  "Arab Countries": "البلدان العربية",
+  "European Countries": "البلدان الأوروبية",
+  "American Countries": "البلدان الأمريكية",
+  "Asian Countries": "البلدان الآسيوية"
+};
+
 const TRENDING_COUNTRIES = [
-  { name: "USA", image: "https://images.unsplash.com/photo-1485738422979-f5c462d49f74?auto=format&fit=crop&q=80&w=800" },
-  { name: "France", image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800" },
-  { name: "Thailand", image: "https://images.unsplash.com/photo-1528181304800-2f140819ad9c?auto=format&fit=crop&q=80&w=800" },
-  { name: "Japan", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800" },
-  { name: "Morocco", image: "https://images.unsplash.com/photo-1489749798305-4fea3ae63d43?auto=format&fit=crop&q=80&w=800" }
+  { name: "الولايات المتحدة", image: "https://images.unsplash.com/photo-1485738422979-f5c462d49f74?auto=format&fit=crop&q=80&w=800" },
+  { name: "فرنسا", image: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800" },
+  { name: "تايلاند", image: "https://images.unsplash.com/photo-1528181304800-2f140819ad9c?auto=format&fit=crop&q=80&w=800" },
+  { name: "اليابان", image: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800" },
+  { name: "المغرب", image: "https://images.unsplash.com/photo-1489749798305-4fea3ae63d43?auto=format&fit=crop&q=80&w=800" },
+  { name: "الإمارات", image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800" }
 ];
 
 const INITIAL_ARTICLES: Article[] = [
   {
     id: '1',
-    title: "The Golden Sands of Dubai",
-    content: "Dubai is a city of superlatives, where the desert meets the sea and the future meets the past. From the Burj Khalifa to the traditional souks, it's a destination like no other.",
-    category: "Arab Countries",
+    title: "سحر الرمال الذهبية في دبي",
+    content: "دبي مدينة العجائب، حيث يلتقي الصحراء بالبحر والمستقبل بالماضي. من برج خليفة إلى الأسواق التقليدية، هي وجهة لا مثيل لها.",
+    category: "البلدان العربية",
     images: ["https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800"],
     date: "2024-03-15",
-    preview: "Discover the luxury and tradition of the Middle East's most vibrant city."
+    preview: "اكتشف الفخامة والتقاليد في أكثر مدن الشرق الأوسط حيوية."
   },
   {
     id: '2',
-    title: "A Parisian Romance",
-    content: "Paris is always a good idea. The Eiffel Tower, the Louvre, and the charming cafes of Montmartre await those who seek beauty and inspiration.",
-    category: "European Countries",
+    title: "رومانسية باريس الخالدة",
+    content: "باريس دائماً فكرة جيدة. برج إيفل، اللوفر، ومقاهي مونمارتر الساحرة تنتظر أولئك الذين يبحثون عن الجمال والإلهام.",
+    category: "البلدان الأوروبية",
     images: ["https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&q=80&w=800"],
     date: "2024-03-14",
-    preview: "Walk through the streets of the world's most romantic city."
+    preview: "تجول في شوارع أكثر مدن العالم رومانسية."
   },
   {
     id: '3',
-    title: "Tokyo: Neon and Tradition",
-    content: "Tokyo is a city that never sleeps, yet finds peace in its ancient temples. Experience the thrill of Shibuya Crossing and the serenity of Meiji Shrine.",
-    category: "Asian Countries",
+    title: "طوكيو: بين التكنولوجيا والتقاليد",
+    content: "طوكيو مدينة لا تنام، ومع ذلك تجد السلام في معابدها القديمة. جرب إثارة تقاطع شيبويا وهدوء ضريح ميجي.",
+    category: "البلدان الآسيوية",
     images: ["https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&q=80&w=800"],
     date: "2024-03-13",
-    preview: "Explore the fascinating contrast between high-tech and history."
+    preview: "استكشف التباين الرائع بين التكنولوجيا العالية والتاريخ."
   }
 ];
 
 export default function App() {
   const [articles, setArticles] = useState<Article[]>([]);
-  const [activeCategory, setActiveCategory] = useState("Home");
+  const [activeCategory, setActiveCategory] = useState("الرئيسية");
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -88,12 +101,12 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('atlas_escape_articles');
+    const saved = localStorage.getItem('voyagea_articles');
     if (saved) {
       setArticles(JSON.parse(saved));
     } else {
       setArticles(INITIAL_ARTICLES);
-      localStorage.setItem('atlas_escape_articles', JSON.stringify(INITIAL_ARTICLES));
+      localStorage.setItem('voyagea_articles', JSON.stringify(INITIAL_ARTICLES));
     }
 
     const handleScroll = () => {
@@ -105,7 +118,7 @@ export default function App() {
 
   const saveArticles = (newArticles: Article[]) => {
     setArticles(newArticles);
-    localStorage.setItem('atlas_escape_articles', JSON.stringify(newArticles));
+    localStorage.setItem('voyagea_articles', JSON.stringify(newArticles));
   };
 
   const handlePublish = (e: React.FormEvent) => {
@@ -118,7 +131,7 @@ export default function App() {
       content: newContent,
       category: newCategory,
       images: newImages.length > 0 ? newImages : ["https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&q=80&w=800"],
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('ar-EG'),
       preview: newContent.substring(0, 100) + "..."
     };
 
@@ -146,24 +159,26 @@ export default function App() {
     }
   };
 
-  const filteredArticles = activeCategory === "Home" 
+  const filteredArticles = activeCategory === "الرئيسية" 
     ? articles 
     : articles.filter(a => a.category === activeCategory);
 
   const latestArticles = articles.slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-[#F5F2ED] text-[#1A1A1A] font-sans selection:bg-[#C5A059] selection:text-white">
+    <div className="min-h-screen bg-[#FFFFFF] text-[#1A1A1A] font-sans selection:bg-[#C5A059] selection:text-white" dir="rtl">
       
       {/* --- Navigation --- */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled ? 'bg-white/90 backdrop-blur-md py-4 shadow-sm' : 'bg-transparent py-6'
+        scrolled ? 'bg-white/95 backdrop-blur-md py-4 shadow-md' : 'bg-transparent py-6'
       }`}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Globe className={`w-8 h-8 ${scrolled ? 'text-[#C5A059]' : 'text-white'}`} />
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${scrolled ? 'bg-[#C5A059] text-white shadow-lg shadow-[#C5A059]/20' : 'bg-white/20 backdrop-blur-md text-white'}`}>
+              <Globe className="w-6 h-6" />
+            </div>
             <h1 className={`text-2xl font-black tracking-tighter uppercase ${scrolled ? 'text-[#1A1A1A]' : 'text-white'}`}>
-              Atlas <span className={scrolled ? 'text-[#C5A059]' : 'text-[#C5A059]'}>Escape</span>
+              Voyagea
             </h1>
           </div>
 
@@ -173,13 +188,16 @@ export default function App() {
               <button 
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`text-sm font-bold uppercase tracking-widest transition-all hover:text-[#C5A059] ${
+                className={`text-sm font-bold tracking-widest transition-all hover:text-[#C5A059] relative py-2 ${
                   activeCategory === cat 
                     ? 'text-[#C5A059]' 
                     : scrolled ? 'text-[#1A1A1A]' : 'text-white'
                 }`}
               >
-                {cat === "Home" ? "Home" : cat.split(' ')[0]}
+                {cat}
+                {activeCategory === cat && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C5A059] rounded-full"></span>
+                )}
               </button>
             ))}
           </div>
@@ -187,13 +205,14 @@ export default function App() {
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsAdminOpen(true)}
-              className={`p-2 rounded-full transition-all ${scrolled ? 'bg-slate-100 text-slate-600' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              className={`p-2.5 rounded-xl transition-all ${scrolled ? 'bg-slate-100 text-slate-600 hover:bg-[#C5A059] hover:text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              title="إضافة مقال"
             >
               <Plus className="w-5 h-5" />
             </button>
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`md:hidden p-2 rounded-full transition-all ${scrolled ? 'bg-slate-100 text-slate-600' : 'bg-white/10 text-white'}`}
+              className={`md:hidden p-2.5 rounded-xl transition-all ${scrolled ? 'bg-slate-100 text-slate-600' : 'bg-white/10 text-white'}`}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -202,13 +221,13 @@ export default function App() {
       </nav>
 
       {/* Mobile Menu Overlay */}
-      <div className={`fixed inset-0 z-40 bg-white transition-all duration-500 md:hidden ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'}`}>
+      <div className={`fixed inset-0 z-40 bg-white transition-all duration-500 md:hidden ${isMenuOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full pointer-events-none'}`}>
         <div className="flex flex-col items-center justify-center h-full gap-8">
           {CATEGORIES.map(cat => (
             <button 
               key={cat}
               onClick={() => { setActiveCategory(cat); setIsMenuOpen(false); }}
-              className="text-2xl font-black uppercase tracking-tighter text-[#1A1A1A] hover:text-[#C5A059]"
+              className="text-2xl font-black tracking-tighter text-[#1A1A1A] hover:text-[#C5A059]"
             >
               {cat}
             </button>
@@ -224,66 +243,55 @@ export default function App() {
             className="w-full h-full object-cover scale-105 animate-slow-zoom"
             alt="Hero Background"
           />
-          <div className="absolute inset-0 bg-black/40 backdrop-grayscale-[0.2]"></div>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
         </div>
 
         <div className="relative z-10 text-center px-6 max-w-4xl">
-          <div className="inline-block px-4 py-1 bg-[#C5A059] text-white text-[10px] font-black uppercase tracking-[0.3em] mb-6 animate-fade-in-up">
-            Premium Travel Magazine
+          <div className="inline-block px-5 py-1.5 bg-[#C5A059] text-white text-[11px] font-black uppercase tracking-[0.3em] mb-8 animate-fade-in-up rounded-full">
+            دليلك المتكامل للسفر
           </div>
-          <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-none mb-8 animate-fade-in-up delay-100">
-            Explore the world through <span className="text-[#C5A059]">stories</span>
+          <h2 className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-tight mb-8 animate-fade-in-up delay-100">
+            استكشف <span className="text-[#C5A059]">أجمل</span> وجهات العالم
           </h2>
-          <p className="text-xl md:text-2xl text-white/80 font-medium mb-12 max-w-2xl mx-auto animate-fade-in-up delay-200">
-            Discover hidden gems, luxury retreats, and authentic cultural experiences across the globe.
+          <p className="text-xl md:text-2xl text-white/90 font-medium mb-12 max-w-2xl mx-auto animate-fade-in-up delay-200 leading-relaxed">
+            منصة لاستكشاف أفضل الأماكن في العالم — مقالات، توصيات، صور، ودليل السفر المتكامل.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-300">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-fade-in-up delay-300">
             <button 
               onClick={() => document.getElementById('latest')?.scrollIntoView({ behavior: 'smooth' })}
-              className="px-10 py-5 bg-white text-[#1A1A1A] font-black uppercase tracking-widest rounded-full hover:bg-[#C5A059] hover:text-white transition-all shadow-2xl flex items-center gap-3"
+              className="px-12 py-5 bg-[#C5A059] text-white font-black uppercase tracking-widest rounded-full hover:bg-white hover:text-[#C5A059] transition-all shadow-2xl flex items-center gap-3 group"
             >
-              Start Exploring <ArrowRight className="w-5 h-5" />
+              ابدأ الاستكشاف <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
             </button>
           </div>
         </div>
 
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce">
-          <div className="w-px h-12 bg-white/30"></div>
+          <div className="w-px h-16 bg-gradient-to-b from-white/50 to-transparent"></div>
         </div>
       </header>
-
-      {/* --- About Section --- */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <Compass className="w-12 h-12 text-[#C5A059] mx-auto mb-8" />
-          <h3 className="text-3xl md:text-4xl font-black text-[#1A1A1A] mb-8 tracking-tight">
-            A modern travel platform where you discover destinations, restaurants, hotels, and real travel experiences.
-          </h3>
-          <div className="w-24 h-1 bg-[#C5A059] mx-auto"></div>
-        </div>
-      </section>
 
       {/* --- Latest Articles --- */}
       <section id="latest" className="py-24 px-6 max-w-7xl mx-auto">
         <div className="flex items-end justify-between mb-16">
           <div>
-            <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-2 block">The Journal</span>
-            <h3 className="text-5xl font-black text-[#1A1A1A] tracking-tighter">Latest Stories</h3>
+            <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-3 block">الجديد لدينا</span>
+            <h3 className="text-5xl font-black text-[#1A1A1A] tracking-tighter">المقالات المنشورة حديثاً</h3>
           </div>
           <div className="hidden md:block w-1/3 h-px bg-slate-200 mb-4"></div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-12">
-          {latestArticles.map((article, idx) => (
+          {latestArticles.map((article) => (
             <div key={article.id} className="group cursor-pointer">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem] mb-8 shadow-xl">
+              <div className="relative aspect-[4/5] overflow-hidden rounded-[2.5rem] mb-8 shadow-2xl">
                 <img 
                   src={article.images[0]} 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   alt={article.title}
                 />
-                <div className="absolute top-6 left-6">
-                  <span className="px-4 py-2 bg-white/90 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest text-[#1A1A1A]">
+                <div className="absolute top-6 right-6">
+                  <span className="px-4 py-2 bg-white/95 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-widest text-[#1A1A1A] shadow-sm">
                     {article.category}
                   </span>
                 </div>
@@ -291,39 +299,39 @@ export default function App() {
               <h4 className="text-2xl font-black text-[#1A1A1A] mb-4 group-hover:text-[#C5A059] transition-colors">
                 {article.title}
               </h4>
-              <p className="text-slate-500 font-medium mb-6 line-clamp-2">
+              <p className="text-slate-500 font-medium mb-6 line-clamp-2 leading-relaxed">
                 {article.preview}
               </p>
               <button className="flex items-center gap-2 text-[#C5A059] font-black uppercase tracking-widest text-xs group-hover:gap-4 transition-all">
-                Read More <ChevronRight className="w-4 h-4" />
+                اقرأ المقال <ChevronRight className="w-4 h-4 rotate-180" />
               </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* --- Trending Countries (Horizontal Scroll) --- */}
-      <section className="py-24 bg-[#1A1A1A] text-white overflow-hidden">
+      {/* --- Trending Countries --- */}
+      <section className="py-24 bg-[#F8F9FA] overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 mb-16">
-          <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-2 block">World Tour</span>
-          <h3 className="text-5xl font-black tracking-tighter">Trending Destinations</h3>
+          <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-3 block">حول العالم</span>
+          <h3 className="text-5xl font-black tracking-tighter text-[#1A1A1A]">أفضل البلدان التي يجب زيارتها</h3>
         </div>
 
         <div className="flex gap-8 overflow-x-auto px-6 pb-12 no-scrollbar snap-x">
           {TRENDING_COUNTRIES.map((country) => (
             <div 
               key={country.name} 
-              className="flex-none w-72 md:w-96 aspect-[3/4] relative rounded-[2.5rem] overflow-hidden group snap-center cursor-pointer shadow-2xl"
+              className="flex-none w-72 md:w-96 aspect-[3/4] relative rounded-[3rem] overflow-hidden group snap-center cursor-pointer shadow-xl"
             >
               <img 
                 src={country.image} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 alt={country.name}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
-              <div className="absolute bottom-10 left-10">
-                <h5 className="text-3xl font-black tracking-tighter mb-2">{country.name}</h5>
-                <div className="w-0 group-hover:w-12 h-1 bg-[#C5A059] transition-all duration-500"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
+              <div className="absolute bottom-10 right-10 text-right">
+                <h5 className="text-3xl font-black tracking-tighter mb-2 text-white">{country.name}</h5>
+                <div className="w-0 group-hover:w-16 h-1 bg-[#C5A059] transition-all duration-500"></div>
               </div>
             </div>
           ))}
@@ -334,20 +342,20 @@ export default function App() {
       <section className="py-24 px-6 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-16 gap-8">
           <div>
-            <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-2 block">Archive</span>
+            <span className="text-[#C5A059] font-black uppercase tracking-widest text-xs mb-3 block">الأرشيف</span>
             <h3 className="text-5xl font-black text-[#1A1A1A] tracking-tighter">
-              {activeCategory === "Home" ? "All Experiences" : `${activeCategory}`}
+              {activeCategory === "الرئيسية" ? "جميع الوجهات" : activeCategory}
             </h3>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {CATEGORIES.map(cat => (
               <button 
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                className={`px-8 py-3.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${
                   activeCategory === cat 
-                    ? 'bg-[#C5A059] text-white shadow-lg shadow-[#C5A059]/20' 
-                    : 'bg-white text-slate-400 hover:bg-slate-50'
+                    ? 'bg-[#C5A059] text-white shadow-xl shadow-[#C5A059]/30 scale-105' 
+                    : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
                 }`}
               >
                 {cat}
@@ -356,37 +364,37 @@ export default function App() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
           {filteredArticles.map((article) => (
-            <div key={article.id} className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-slate-100 group hover:shadow-xl transition-all duration-500">
-              <div className="relative aspect-video overflow-hidden rounded-[2rem] mb-6">
+            <div key={article.id} className="bg-white rounded-[3rem] p-5 shadow-sm border border-slate-100 group hover:shadow-2xl transition-all duration-500">
+              <div className="relative aspect-video overflow-hidden rounded-[2.5rem] mb-6">
                 <img 
                   src={article.images[0]} 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   alt={article.title}
                 />
-                <div className="absolute bottom-4 left-4">
-                  <span className="px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-full text-[8px] font-black uppercase tracking-widest text-[#1A1A1A]">
+                <div className="absolute bottom-4 right-4">
+                  <span className="px-4 py-2 bg-white/95 backdrop-blur-md rounded-full text-[9px] font-black uppercase tracking-widest text-[#1A1A1A] shadow-sm">
                     {article.category}
                   </span>
                 </div>
               </div>
               <div className="px-4 pb-4">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-                  <Clock className="w-3 h-3" /> {article.date}
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+                  <Clock className="w-3.5 h-3.5" /> {article.date}
                 </div>
-                <h4 className="text-xl font-black text-[#1A1A1A] mb-3 group-hover:text-[#C5A059] transition-colors">
+                <h4 className="text-2xl font-black text-[#1A1A1A] mb-4 group-hover:text-[#C5A059] transition-colors">
                   {article.title}
                 </h4>
-                <p className="text-slate-500 text-sm font-medium line-clamp-2 mb-6">
+                <p className="text-slate-500 text-sm font-medium line-clamp-2 mb-8 leading-relaxed">
                   {article.preview}
                 </p>
-                <div className="flex items-center justify-between">
-                  <button className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors">
-                    <Heart className="w-5 h-5" />
+                <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                  <button className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                    <Heart className="w-6 h-6" />
                   </button>
-                  <button className="text-[10px] font-black uppercase tracking-widest text-[#C5A059] flex items-center gap-2">
-                    Read <ArrowRight className="w-4 h-4" />
+                  <button className="text-[11px] font-black uppercase tracking-widest text-[#C5A059] flex items-center gap-2 group/btn">
+                    اقرأ المزيد <ArrowRight className="w-4 h-4 rotate-180 group-hover/btn:-translate-x-2 transition-transform" />
                   </button>
                 </div>
               </div>
@@ -395,165 +403,167 @@ export default function App() {
         </div>
 
         {filteredArticles.length === 0 && (
-          <div className="py-24 text-center">
-            <Navigation className="w-16 h-16 text-slate-200 mx-auto mb-6" />
-            <p className="text-slate-400 font-bold uppercase tracking-widest">No stories found in this category yet.</p>
+          <div className="py-32 text-center">
+            <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8">
+              <Navigation className="w-10 h-10 text-slate-200" />
+            </div>
+            <p className="text-slate-400 font-black uppercase tracking-widest">لا توجد مقالات في هذا التصنيف حالياً.</p>
           </div>
         )}
       </section>
 
       {/* --- Footer --- */}
-      <footer className="bg-white border-t border-slate-100 py-24 px-6">
+      <footer className="bg-[#1A1A1A] text-white py-24 px-6">
         <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-16">
           <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-8">
-              <Globe className="w-10 h-10 text-[#C5A059]" />
-              <h1 className="text-3xl font-black tracking-tighter uppercase text-[#1A1A1A]">
-                Atlas <span className="text-[#C5A059]">Escape</span>
+            <div className="flex items-center gap-3 mb-10">
+              <div className="w-12 h-12 bg-[#C5A059] rounded-2xl flex items-center justify-center shadow-lg shadow-[#C5A059]/20">
+                <Globe className="w-7 h-7 text-white" />
+              </div>
+              <h1 className="text-3xl font-black tracking-tighter uppercase">
+                Voyagea
               </h1>
             </div>
-            <p className="text-slate-500 font-medium text-lg max-w-md leading-relaxed">
-              We are a global community of travelers, storytellers, and dreamers. Join us as we explore the most beautiful corners of our planet.
+            <p className="text-white/60 font-medium text-lg max-w-md leading-relaxed">
+              نحن مجتمع عالمي من المسافرين، رواة القصص، والحالمين. انضم إلينا بينما نستكشف أجمل زوايا كوكبنا.
             </p>
           </div>
           <div>
-            <h6 className="text-xs font-black uppercase tracking-widest text-[#1A1A1A] mb-8">Explore</h6>
-            <ul className="space-y-4">
+            <h6 className="text-xs font-black uppercase tracking-widest text-[#C5A059] mb-10">استكشف</h6>
+            <ul className="space-y-5">
               {CATEGORIES.map(cat => (
                 <li key={cat}>
-                  <button onClick={() => setActiveCategory(cat)} className="text-slate-500 font-bold hover:text-[#C5A059] transition-colors">{cat}</button>
+                  <button onClick={() => setActiveCategory(cat)} className="text-white/60 font-bold hover:text-[#C5A059] transition-colors">{cat}</button>
                 </li>
               ))}
             </ul>
           </div>
           <div>
-            <h6 className="text-xs font-black uppercase tracking-widest text-[#1A1A1A] mb-8">Newsletter</h6>
-            <p className="text-slate-500 text-sm mb-6">Get the latest stories delivered to your inbox.</p>
-            <div className="flex gap-2">
+            <h6 className="text-xs font-black uppercase tracking-widest text-[#C5A059] mb-10">النشرة البريدية</h6>
+            <p className="text-white/60 text-sm mb-8">احصل على أحدث القصص مباشرة في بريدك الإلكتروني.</p>
+            <div className="flex gap-3">
               <input 
                 type="email" 
-                placeholder="Email address" 
-                className="flex-1 bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-[#C5A059] outline-none"
+                placeholder="البريد الإلكتروني" 
+                className="flex-1 bg-white/5 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-2 focus:ring-[#C5A059] outline-none text-white"
               />
-              <button className="p-4 bg-[#1A1A1A] text-white rounded-2xl hover:bg-[#C5A059] transition-all">
-                <Send className="w-5 h-5" />
+              <button className="p-4 bg-[#C5A059] text-white rounded-2xl hover:bg-white hover:text-[#C5A059] transition-all">
+                <Send className="w-5 h-5 rotate-180" />
               </button>
             </div>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto mt-24 pt-8 border-t border-slate-50 flex flex-col md:flex-row items-center justify-between gap-8">
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2024 Atlas Escape. All rights reserved.</p>
-          <div className="flex gap-8">
-            <button className="text-slate-400 hover:text-[#C5A059] transition-colors"><Globe className="w-5 h-5" /></button>
-            <button className="text-slate-400 hover:text-[#C5A059] transition-colors"><MapPin className="w-5 h-5" /></button>
-            <button className="text-slate-400 hover:text-[#C5A059] transition-colors"><Search className="w-5 h-5" /></button>
+        <div className="max-w-7xl mx-auto mt-24 pt-10 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-8">
+          <p className="text-white/40 text-xs font-bold uppercase tracking-widest">© 2024 Voyagea. جميع الحقوق محفوظة.</p>
+          <div className="flex gap-10">
+            <button className="text-white/40 hover:text-[#C5A059] transition-colors"><Globe className="w-6 h-6" /></button>
+            <button className="text-white/40 hover:text-[#C5A059] transition-colors"><MapPin className="w-6 h-6" /></button>
+            <button className="text-white/40 hover:text-[#C5A059] transition-colors"><Search className="w-6 h-6" /></button>
           </div>
         </div>
       </footer>
 
       {/* --- Admin Modal --- */}
-      <AnimatePresence>
-        {isAdminOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-[#1A1A1A]/90 backdrop-blur-xl" onClick={() => setIsAdminOpen(false)}></div>
-            <div className="relative bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-modal-in">
-              <div className="p-12">
-                <div className="flex items-center justify-between mb-12">
-                  <div>
-                    <span className="text-[#C5A059] font-black uppercase tracking-widest text-[10px] mb-2 block">Editor Panel</span>
-                    <h3 className="text-4xl font-black text-[#1A1A1A] tracking-tighter">Publish New Story</h3>
-                  </div>
-                  <button onClick={() => setIsAdminOpen(false)} className="p-4 bg-slate-50 text-slate-400 rounded-3xl hover:bg-red-50 hover:text-red-500 transition-all">
-                    <X className="w-6 h-6" />
-                  </button>
+      {isAdminOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-[#1A1A1A]/95 backdrop-blur-2xl" onClick={() => setIsAdminOpen(false)}></div>
+          <div className="relative bg-white w-full max-w-2xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-modal-in">
+            <div className="p-12">
+              <div className="flex items-center justify-between mb-12">
+                <div>
+                  <span className="text-[#C5A059] font-black uppercase tracking-widest text-[10px] mb-3 block">لوحة التحكم</span>
+                  <h3 className="text-4xl font-black text-[#1A1A1A] tracking-tighter">إضافة مقال جديد</h3>
+                </div>
+                <button onClick={() => setIsAdminOpen(false)} className="p-4 bg-slate-50 text-slate-400 rounded-[2rem] hover:bg-red-50 hover:text-red-500 transition-all">
+                  <X className="w-7 h-7" />
+                </button>
+              </div>
+
+              <form onSubmit={handlePublish} className="space-y-8">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 mr-6">عنوان المقال</label>
+                  <input 
+                    type="text" 
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="مثال: أسرار المعابد المفقودة في بالي"
+                    className="w-full bg-slate-50 border-none rounded-[2rem] px-8 py-5 text-lg font-bold text-slate-900 focus:ring-2 focus:ring-[#C5A059] outline-none transition-all"
+                    required
+                  />
                 </div>
 
-                <form onSubmit={handlePublish} className="space-y-6">
+                <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">Story Title</label>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 mr-6">التصنيف</label>
+                    <select 
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="w-full bg-slate-50 border-none rounded-[2rem] px-8 py-5 font-bold text-slate-900 focus:ring-2 focus:ring-[#C5A059] outline-none appearance-none cursor-pointer"
+                    >
+                      {CATEGORIES.slice(1).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 mr-6">الصور</label>
+                    <button 
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full bg-slate-50 border-none rounded-[2rem] px-8 py-5 font-bold text-slate-400 hover:bg-slate-100 transition-all flex items-center justify-center gap-3"
+                    >
+                      <Camera className="w-5 h-5" />
+                      {newImages.length > 0 ? `${newImages.length} صور` : 'تحميل صور'}
+                    </button>
                     <input 
-                      type="text" 
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      placeholder="e.g. The Hidden Temples of Bali"
-                      className="w-full bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 text-lg font-bold text-slate-900 focus:ring-2 focus:ring-[#C5A059] outline-none transition-all"
-                      required
+                      type="file" 
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      multiple
+                      accept="image/*"
+                      className="hidden"
                     />
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">Category</label>
-                      <select 
-                        value={newCategory}
-                        onChange={(e) => setNewCategory(e.target.value)}
-                        className="w-full bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 font-bold text-slate-900 focus:ring-2 focus:ring-[#C5A059] outline-none appearance-none cursor-pointer"
-                      >
-                        {CATEGORIES.slice(1).map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">Media</label>
-                      <button 
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full bg-slate-50 border-none rounded-[1.5rem] px-8 py-5 font-bold text-slate-400 hover:bg-slate-100 transition-all flex items-center justify-center gap-3"
-                      >
-                        <ImageIcon className="w-5 h-5" />
-                        {newImages.length > 0 ? `${newImages.length} Images` : 'Upload Images'}
-                      </button>
-                      <input 
-                        type="file" 
-                        ref={fileInputRef}
-                        onChange={handleImageUpload}
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 mr-6">نص المقال</label>
+                  <textarea 
+                    value={newContent}
+                    onChange={(e) => setNewContent(e.target.value)}
+                    placeholder="شاركنا تفاصيل التجربة..."
+                    rows={6}
+                    className="w-full bg-slate-50 border-none rounded-[2.5rem] px-8 py-6 text-lg font-medium text-slate-700 focus:ring-2 focus:ring-[#C5A059] outline-none transition-all resize-none"
+                    required
+                  ></textarea>
+                </div>
 
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-4">The Story</label>
-                    <textarea 
-                      value={newContent}
-                      onChange={(e) => setNewContent(e.target.value)}
-                      placeholder="Share the experience..."
-                      rows={6}
-                      className="w-full bg-slate-50 border-none rounded-[2rem] px-8 py-6 text-lg font-medium text-slate-700 focus:ring-2 focus:ring-[#C5A059] outline-none transition-all resize-none"
-                      required
-                    ></textarea>
-                  </div>
-
-                  <button 
-                    type="submit"
-                    className="w-full bg-[#1A1A1A] text-white py-6 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl hover:bg-[#C5A059] transition-all transform active:scale-95"
-                  >
-                    Publish Article
-                  </button>
-                </form>
-              </div>
+                <button 
+                  type="submit"
+                  className="w-full bg-[#1A1A1A] text-white py-6 rounded-full font-black uppercase tracking-widest text-lg shadow-2xl hover:bg-[#C5A059] transition-all transform active:scale-95"
+                >
+                  نشر المقال
+                </button>
+              </form>
             </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       {/* --- Floating Admin Button --- */}
       <button 
         onClick={() => setIsAdminOpen(true)}
-        className="fixed bottom-10 right-10 z-50 w-16 h-16 bg-[#C5A059] text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all active:scale-90"
+        className="fixed bottom-10 left-10 z-50 w-16 h-16 bg-[#C5A059] text-white rounded-[2rem] shadow-2xl flex items-center justify-center hover:scale-110 transition-all active:scale-90 group"
       >
-        <Settings className="w-8 h-8 animate-spin-slow" />
+        <Plus className="w-8 h-8 group-hover:rotate-90 transition-transform duration-500" />
       </button>
 
       {/* --- Styles --- */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
         
         body {
-          font-family: 'Poppins', sans-serif;
+          font-family: 'Cairo', sans-serif;
           overflow-x: hidden;
         }
 
@@ -592,14 +602,6 @@ export default function App() {
           animation: modal-in 0.6s forwards cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .animate-spin-slow {
-          animation: spin 8s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
         .line-clamp-2 {
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -610,15 +612,3 @@ export default function App() {
     </div>
   );
 }
-
-// --- Helper Components ---
-const AnimatePresence = ({ children }: { children: React.ReactNode }) => {
-  return <>{children}</>;
-};
-
-const Send = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <line x1="22" y1="2" x2="11" y2="13"></line>
-    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-  </svg>
-);
